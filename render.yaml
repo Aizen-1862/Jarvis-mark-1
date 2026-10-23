@@ -1,13 +1,17 @@
+
 services:
   - type: web
     name: jarvis
     runtime: python
-    buildCommand: echo "JARVIS uses only the Python standard library"
-    startCommand: python jarvis.py
+    plan: free
+    buildCommand: python --version
+    startCommand: python -u jarvis.py
     healthCheckPath: /healthz
     envVars:
+      - key: PYTHONUNBUFFERED
+        value: "1"
       - key: JARVIS_HOST
-        value: 0.0.0.0
+        value: "0.0.0.0"
       - key: JARVIS_NO_BROWSER
         value: "1"
       - key: JARVIS_ACCESS_PASSWORD
