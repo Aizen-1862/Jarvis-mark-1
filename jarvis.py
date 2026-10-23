@@ -6,6 +6,8 @@ Start it with run.bat (Windows) or ./run.sh (Mac/Linux).
 from __future__ import annotations
 
 import json
+import base64
+import hmac
 import os
 import re
 import sys
@@ -35,6 +37,7 @@ DEFAULTS = {
     "OPENROUTER_MODEL": "apodex/apodex-1.1-mini:free",  # the brain, free on OpenRouter
     "JARVIS_CALLS_YOU": "sir",
     "PORT": "8765",
+    "JARVIS_HOST": "127.0.0.1",
 }
 
 NO_BROWSER = os.environ.get("JARVIS_NO_BROWSER") == "1"  # for testing: never open browser tabs
@@ -64,6 +67,11 @@ def load_settings() -> dict[str, str]:
     # Keys come from the .env file only, so a key another app left in the system environment
     # never gets used by surprise. The other settings can be overridden for testing.
     for key in DEFAULTS:
+        if os.environ.get(key):
+            cfg[key] = os.environ[key].strip()
+    # Cloud hosts provide secrets as environment variables. Keep local .env support,
+    # while allowing explicitly configured deployment secrets to take precedence.
+    for key in ("FISH_API_KEY", "OPENROUTER_API_KEY"):
         if os.environ.get(key):
             cfg[key] = os.environ[key].strip()
     return cfg
@@ -425,6 +433,30 @@ class Handler(BaseHTTPRequestHandler):
     def _json(self, code: int, payload: dict) -> None:
         self._send(code, json.dumps(payload).encode("utf-8"), "application/json")
 
+    def _authorized(self) -> bool:
+        password = os.environ.get("JARVIS_ACCESS_PASSWORD", "")
+        if not password:
+            return self.server.host in ("127.0.0.1", "::1", "localhost")
+        header = self.headers.get("Authorization", "")
+        scheme, _, encoded = header.partition(" ")
+        if scheme.lower() != "basic" or not encoded:
+            return False
+        try:
+            decoded = base64.b64decode(encoded, validate=True).decode("utf-8")
+        except (ValueError, UnicodeDecodeError):
+            return False
+        username, separator, supplied = decoded.partition(":")
+        return bool(separator and username == "jarvis" and hmac.compare_digest(supplied, password))
+
+    def _require_auth(self) -> bool:
+        if self._authorized():
+            return True
+        self.send_response(401)
+        self.send_header("WWW-Authenticate", 'Basic realm="JARVIS", charset="UTF-8"')
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+        return False
+
     def _read_json(self) -> dict:
         length = int(self.headers.get("Content-Length") or 0)
         if length <= 0 or length > 100_000:
@@ -437,6 +469,11 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:
         path = self.path.split("?", 1)[0]
+        if path == "/healthz":
+            self._json(200, {"ok": True})
+            return
+        if not self._require_auth():
+            return
         if path in ("/", "/index.html"):
             self._send(200, INDEX_HTML.read_bytes(), "text/html; charset=utf-8")
         elif path == "/api/status":
@@ -455,6 +492,8 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:
         global _voice_override
+        if not self._require_auth():
+            return
         path = self.path.split("?", 1)[0]
         cfg = load_settings()
         data = self._read_json()
@@ -607,13 +646,25 @@ def main() -> None:
     except (AttributeError, ValueError):
         pass
     print(BANNER)
-    cfg = first_run(load_settings())
+    cfg = load_settings()
+    host = cfg.get("JARVIS_HOST") or "127.0.0.1"
+    hosted = host not in ("127.0.0.1", "::1", "localhost")
+    if hosted and not os.environ.get("JARVIS_ACCESS_PASSWORD"):
+        print("\n  JARVIS_ACCESS_PASSWORD is required when binding beyond this computer.\n")
+        sys.exit(1)
+    if hosted and not (cfg.get("FISH_API_KEY") and cfg.get("OPENROUTER_API_KEY")):
+        print("\n  FISH_API_KEY and OPENROUTER_API_KEY are required in hosted mode.\n")
+        sys.exit(1)
+    if not hosted:
+        cfg = first_run(cfg)
 
     port = int(cfg.get("PORT") or 8765)
     server = None
-    for candidate in range(port, port + 20):
+    candidates = (port,) if hosted else range(port, port + 20)
+    for candidate in candidates:
         try:
-            server = Server(("127.0.0.1", candidate), Handler)
+            server = Server((host, candidate), Handler)
+            server.host = host
             break
         except OSError:
             continue
@@ -624,12 +675,13 @@ def main() -> None:
     url = f"http://127.0.0.1:{server.server_address[1]}"
     print("\n  ==================================================")
     print("    J.A.R.V.I.S. is online")
-    print(f"    Open {url}  (Chrome or Edge, for voice input)")
+    print("    Hosted mode: use the HTTPS URL provided by your hosting service." if hosted
+          else f"    Open {url}  (Chrome or Edge, for voice input)")
     print(f"    Voice: Fish Audio {cfg['FISH_VOICE_ID']} ({cfg['FISH_MODEL']})")
     print(f"    Brain: OpenRouter {cfg['OPENROUTER_MODEL']}" if cfg.get("OPENROUTER_API_KEY") else "    Brain: not connected yet")
     print("    Close this window to shut JARVIS down.")
     print("  ==================================================\n")
-    if not NO_BROWSER:
+    if not NO_BROWSER and not hosted:
         threading.Timer(1.0, lambda: webbrowser.open(url)).start()
     try:
         server.serve_forever()
