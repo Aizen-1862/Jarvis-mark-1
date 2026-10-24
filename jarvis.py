@@ -578,6 +578,60 @@ class Handler(BaseHTTPRequestHandler):
             self._send(200, INDEX_HTML.read_bytes(), "text/html; charset=utf-8")
         elif path == "/lab.html":
             self._send(200, LAB_HTML.read_bytes(), "text/html; charset=utf-8")
+        elif path == "/api/models":
+            # Public Sketchfab search; downloading a model itself may require the creator's
+            # download permission and a signed-in Sketchfab account.
+            params = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+            query = str((params.get("q") or [""])[0]).strip()[:120]
+            downloadable_only = str((params.get("downloadable") or ["false"])[0]).lower() in ("1", "true", "yes")
+            if len(query) < 2:
+                self._json(400, {"error": "Enter at least two characters to search for a 3D model."})
+                return
+            search_params = {"type": "models", "q": query, "count": "18"}
+            if downloadable_only:
+                search_params["downloadable"] = "true"
+            search_url = "https://api.sketchfab.com/v3/search?" + urllib.parse.urlencode(search_params)
+            request = urllib.request.Request(search_url, headers={
+                "Accept": "application/json",
+                "User-Agent": "JARVIS-Learning-Lab/1.0",
+            })
+            try:
+                with urllib.request.urlopen(request, timeout=15) as response:  # noqa: S310 - fixed Sketchfab API host
+                    payload = json.loads(response.read().decode("utf-8"))
+                raw_results = payload.get("results") or {}
+                if isinstance(raw_results, dict):
+                    raw_results = raw_results.get("models") or []
+                models = []
+                for model in raw_results[:18]:
+                    if not isinstance(model, dict):
+                        continue
+                    thumbnails = ((model.get("thumbnails") or {}).get("images") or [])
+                    thumbnail = max(thumbnails, key=lambda item: (item.get("width") or 0) * (item.get("height") or 0), default={})
+                    uid = str(model.get("uid") or "")
+                    viewer_url = str(model.get("viewerUrl") or "")
+                    embed_url = str(model.get("embedUrl") or (f"https://sketchfab.com/models/{uid}/embed" if uid else ""))
+                    if not viewer_url and uid:
+                        viewer_url = f"https://sketchfab.com/3d-models/{uid}"
+                    models.append({
+                        "uid": uid,
+                        "name": str(model.get("name") or "Untitled 3D model")[:240],
+                        "creator": str(((model.get("user") or {}).get("displayName") or (model.get("user") or {}).get("username") or "Sketchfab creator"))[:100],
+                        "thumbnail": str(thumbnail.get("url") or ""),
+                        "viewer_url": viewer_url,
+                        "embed_url": embed_url,
+                        "downloadable": bool(model.get("isDownloadable")),
+                        "license": str(model.get("license") or "Check model page")[:100],
+                        "likes": int(model.get("likeCount") or 0),
+                    })
+                self._json(200, {"query": query, "source": "Sketchfab", "results": models, "count": len(models)})
+            except urllib.error.HTTPError as err:
+                log(f"Sketchfab model search HTTP {err.code}")
+                self._json(502, {"error": "Sketchfab's search service returned an error. Try again in a moment."})
+            except (urllib.error.URLError, TimeoutError):
+                self._json(502, {"error": "Couldn't reach Sketchfab. Check your internet connection and try again."})
+            except (json.JSONDecodeError, UnicodeDecodeError, TypeError, ValueError) as err:
+                log(f"Sketchfab model search response error: {err!r}")
+                self._json(502, {"error": "Sketchfab returned an unreadable search response. Please try again."})
         elif path == "/api/status":
             cfg = load_settings()
             self._json(200, {
