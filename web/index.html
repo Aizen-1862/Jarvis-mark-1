@@ -380,6 +380,10 @@
         <button class="arcade-card" type="button" data-arcade-game="tictactoe"><span class="arcade-icon">✕</span><strong>TIC-TAC-TOE</strong><span>Outsmart the system in a quick grid duel.</span><span class="arcade-tag">PLAY NOW</span></button>
         <button class="arcade-card" type="button" data-arcade-game="mathblitz"><span class="arcade-icon">∑</span><strong>MATH BLITZ</strong><span>Solve as many rapid-fire equations as you can in 30 seconds.</span><span class="arcade-tag">SPEED CHALLENGE</span></button>
         <button class="arcade-card" type="button" data-arcade-game="numberhunt"><span class="arcade-icon">◎</span><strong>NUMBER HUNT</strong><span>Track down the hidden number with hot-and-cold clues.</span><span class="arcade-tag">LOGIC CHALLENGE</span></button>
+
+        <button class="arcade-card" type="button" data-arcade-game="snake"><span class="arcade-icon">🐍</span><strong>SNAKE.exe</strong><span>Collect energy, grow longer, and don't hit the walls.</span><span class="arcade-tag">PLAY NOW</span></button>
+        <button class="arcade-card" type="button" data-arcade-game="pong"><span class="arcade-icon">◉</span><strong>NEON PONG</strong><span>Face the JARVIS paddle in a neon table-tennis duel.</span><span class="arcade-tag">PLAY NOW</span></button>
+        <button class="arcade-card" type="button" data-arcade-game="racer"><span class="arcade-icon">🏎</span><strong>CYBER RACER</strong><span>Dodge traffic, survive the highway, and chase a high score.</span><span class="arcade-tag">PLAY NOW</span></button>
       </div>
       <div class="arcade-stage" id="arcadeStage" hidden></div>
       <div class="arcade-small" style="margin-top:16px">ARCADE SYSTEM · MORE SIMULATIONS CAN BE ADDED HERE WITHOUT CROWDING THE MAIN HUD</div>
@@ -1453,6 +1457,8 @@
     arcadeReactionReady=false;
   }
   function arcadeHome() {
+    if(arcadeCanvasFrame)cancelAnimationFrame(arcadeCanvasFrame);
+    if(arcadeCanvasKeyHandler){document.removeEventListener('keydown',arcadeCanvasKeyHandler);arcadeCanvasKeyHandler=null;}
     if (arcadeMathTimer) { clearInterval(arcadeMathTimer); arcadeMathTimer=null; }
     if (arcadeReactionTimer) { clearTimeout(arcadeReactionTimer); arcadeReactionTimer=null; }
     arcadeReactionReady=false;
@@ -1466,9 +1472,12 @@
     arcadeStage.innerHTML='<h3>'+title+'</h3>'+body;
   }
   function arcadeLaunch(name) {
+    if(arcadeCanvasFrame)cancelAnimationFrame(arcadeCanvasFrame);
+    if(arcadeCanvasKeyHandler){document.removeEventListener('keydown',arcadeCanvasKeyHandler);arcadeCanvasKeyHandler=null;}
     if (arcadeMathTimer) { clearInterval(arcadeMathTimer); arcadeMathTimer=null; }
     if (name==='chess') { arcadeClose(); chessOpen(); return; }
     if (name==='space') { arcadeStartSpaceDefender(); return; }
+    if (name==='snake'||name==='pong'||name==='racer') { arcadeStartCanvasGame(name); return; }
     if (name==='escape') { arcadeStartCyberEscape(); return; }
     if (name==='reaction') {
       arcadeStageView('REACTION TEST','<div class="arcade-status" id="reactionStatus">Press START, then wait for the panel to turn green. Click only when it does.</div><div id="reactionPad" style="display:grid;place-items:center;min-height:150px;margin-top:14px;border:1px solid rgba(63,216,255,.3);border-radius:12px;background:rgba(8,34,49,.8);font:700 18px Orbitron,sans-serif;color:#7bffdf;text-align:center;cursor:pointer">READY WHEN YOU ARE</div><div class="arcade-controls"><button class="chess-btn" type="button" id="reactionStart">START TEST</button><span class="arcade-small" id="reactionBest"></span></div><div class="arcade-controls"><button class="chess-btn" type="button" data-arcade-back>BACK TO HUB</button></div>');
@@ -1575,6 +1584,49 @@
     else status.textContent='Attempt '+arcadeCodeAttempts+' of 10. Keep decoding.';
   }
 
+
+
+  // ---- Three extra canvas games: Snake, Neon Pong, and Cyber Racer.
+  let arcadeCanvasFrame=0, arcadeCanvasKeyHandler=null;
+  function arcadeStartCanvasGame(kind) {
+    if(arcadeCanvasFrame)cancelAnimationFrame(arcadeCanvasFrame);
+    if(arcadeCanvasKeyHandler)document.removeEventListener('keydown',arcadeCanvasKeyHandler);
+    const titles={snake:'SNAKE.exe',pong:'NEON PONG',racer:'CYBER RACER'};
+    const help={snake:'Use arrow keys or WASD. On mobile, tap the direction buttons.',pong:'Move with ↑ / ↓ or W / S. JARVIS controls the opposite paddle.',racer:'Use ← / → or A / D to switch lanes. Avoid the traffic!'};
+    arcadeStageView(titles[kind],'<div class="arcade-status" id="canvasGameStatus">'+help[kind]+'</div><canvas id="arcadeGameCanvas" width="720" height="420" style="width:100%;max-width:720px;display:block;margin:14px auto;border:1px solid rgba(123,255,223,.35);border-radius:10px;background:#020813;touch-action:none"></canvas><div class="arcade-controls" style="justify-content:center"><button class="chess-btn" type="button" data-dir="left">◀ LEFT</button><button class="chess-btn" type="button" data-dir="up">▲ UP</button><button class="chess-btn" type="button" data-dir="down">▼ DOWN</button><button class="chess-btn" type="button" data-dir="right">RIGHT ▶</button><button class="chess-btn" id="canvasGameRestart" type="button">RESTART</button><button class="chess-btn" type="button" data-arcade-back>BACK TO HUB</button></div><div class="arcade-small" id="canvasGameScore" style="text-align:center;margin-top:8px">SCORE 0</div>');
+    const canvas=$('arcadeGameCanvas'),ctx=canvas.getContext('2d'),W=canvas.width,H=canvas.height;
+    let running=true,over=false,score=0,last=0,acc=0,keys={},snake=[{x:10,y:10},{x:9,y:10},{x:8,y:10}],dir={x:1,y:0},next={x:1,y:0},food={x:15,y:10},ball={x:W/2,y:H/2,vx:5,vy:3},p1=H/2,p2=H/2,playerLane=1,traffic=[],spawnTick=0,roadOffset=0;
+    const rand=(n)=>Math.floor(Math.random()*n);
+    const placeFood=()=>{let p;do{p={x:rand(30),y:rand(17)}}while(snake.some(a=>a.x===p.x&&a.y===p.y));food=p;};
+    const reset=()=>{if(kind==='snake'){snake=[{x:10,y:10},{x:9,y:10},{x:8,y:10}];dir={x:1,y:0};next={x:1,y:0};placeFood();}if(kind==='pong'){ball={x:W/2,y:H/2,vx:5*(Math.random()<.5?-1:1),vy:3};p1=H/2;p2=H/2;}if(kind==='racer'){playerLane=1;traffic=[];spawnTick=0;roadOffset=0;}score=0;over=false;running=true;$('canvasGameStatus').textContent=help[kind];};
+    const setDir=(d)=>{if(kind==='snake'){const m={left:{x:-1,y:0},right:{x:1,y:0},up:{x:0,y:-1},down:{x:0,y:1}}[d];if(m&&!(m.x===-dir.x&&m.y===-dir.y))next=m;}else if(kind==='pong'){if(d==='up')keys.ArrowUp=true;if(d==='down')keys.ArrowDown=true;if(d==='up'||d==='down')setTimeout(()=>{keys.ArrowUp=false;keys.ArrowDown=false;},170);}else if(kind==='racer'){if(d==='left')playerLane=Math.max(0,playerLane-1);if(d==='right')playerLane=Math.min(2,playerLane+1);}};
+    document.querySelectorAll('#arcadeStage [data-dir]').forEach(b=>{b.onclick=()=>setDir(b.dataset.dir);});
+    arcadeCanvasKeyHandler=e=>{if(!document.getElementById('arcadeGameCanvas'))return;const k=e.key.toLowerCase();if(['arrowleft','arrowright','arrowup','arrowdown',' '].includes(k))e.preventDefault();keys[k]=true;if(kind==='snake'){if(k==='arrowleft'||k==='a')setDir('left');if(k==='arrowright'||k==='d')setDir('right');if(k==='arrowup'||k==='w')setDir('up');if(k==='arrowdown'||k==='s')setDir('down');}if(kind==='racer'){if(k==='arrowleft'||k==='a')setDir('left');if(k==='arrowright'||k==='d')setDir('right');}};
+    document.addEventListener('keydown',arcadeCanvasKeyHandler);
+    const draw=(now)=>{
+      if(!document.getElementById('arcadeGameCanvas'))return;
+      const dt=Math.min((now-last)/16.67||1,2);last=now;
+      ctx.fillStyle='#020813';ctx.fillRect(0,0,W,H);
+      if(kind==='snake'){
+        ctx.strokeStyle='rgba(63,216,255,.07)';for(let x=0;x<W;x+=24){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke()}for(let y=0;y<H;y+=24){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke()}
+        if(!over){acc+=dt;if(acc>5){acc=0;dir=next;const head={x:snake[0].x+dir.x,y:snake[0].y+dir.y};if(head.x<0||head.x>=30||head.y<0||head.y>=17||snake.some((p,i)=>i>0&&p.x===head.x&&p.y===head.y)){over=true;}else{snake.unshift(head);if(head.x===food.x&&head.y===food.y){score+=10;placeFood();}else snake.pop();}}}
+        ctx.fillStyle='#ff647c';ctx.shadowBlur=12;ctx.shadowColor='#ff647c';ctx.fillRect(food.x*24+3,food.y*24+3,18,18);ctx.shadowColor='#7bffdf';ctx.fillStyle='#7bffdf';snake.forEach((p,i)=>{ctx.globalAlpha=i===0?1:.55;ctx.fillRect(p.x*24+2,p.y*24+2,20,20)});ctx.globalAlpha=1;ctx.shadowBlur=0;
+      } else if(kind==='pong'){
+        if(!over){if(keys.arrowup||keys.w)p1-=7*dt;if(keys.arrowdown||keys.s)p1+=7*dt;p1=Math.max(45,Math.min(H-45,p1));p2+=(ball.y-p2)*.045*dt;ball.x+=ball.vx*dt;ball.y+=ball.vy*dt;if(ball.y<8||ball.y>H-8)ball.vy*=-1;if(ball.x<45&&Math.abs(ball.y-p1)<54){ball.vx=Math.abs(ball.vx)*1.04;ball.vy+=(ball.y-p1)*.08;}if(ball.x>W-45&&Math.abs(ball.y-p2)<54){ball.vx=-Math.abs(ball.vx)*1.03;ball.vy+=(ball.y-p2)*.08;}if(ball.x<0){over=true;$('canvasGameStatus').textContent='JARVIS wins this point. Press RESTART to play again.';}if(ball.x>W){score++;ball={x:W/2,y:H/2,vx:-5,vy:rand(5)-2};}if(score>=5){over=true;$('canvasGameStatus').textContent='YOU WIN! First to 5 points.';}}
+        ctx.setLineDash([8,10]);ctx.strokeStyle='rgba(123,255,223,.35)';ctx.beginPath();ctx.moveTo(W/2,0);ctx.lineTo(W/2,H);ctx.stroke();ctx.setLineDash([]);ctx.fillStyle='#7bffdf';ctx.shadowBlur=14;ctx.shadowColor='#7bffdf';ctx.fillRect(24,p1-45,10,90);ctx.fillStyle='#ff7ab6';ctx.fillRect(W-34,p2-45,10,90);ctx.beginPath();ctx.arc(ball.x,ball.y,9,0,Math.PI*2);ctx.fill();ctx.shadowBlur=0;
+      } else {
+        roadOffset=(roadOffset+5*dt)%60;ctx.fillStyle='#091a28';ctx.fillRect(150,0,420,H);ctx.strokeStyle='#7bffdf';ctx.globalAlpha=.45;ctx.strokeRect(150,0,420,H);ctx.globalAlpha=1;for(let y=-60;y<H;y+=60){ctx.fillStyle='#477084';ctx.fillRect(290,y+roadOffset,4,28);ctx.fillRect(430,y+roadOffset,4,28);}
+        if(!over){spawnTick+=dt;if(spawnTick>24){spawnTick=0;traffic.push({lane:rand(3),y:-60});}traffic.forEach(t=>t.y+=4.5*dt);traffic=traffic.filter(t=>t.y<H+60);if(traffic.some(t=>t.lane===playerLane&&t.y>H-105&&t.y<H-25)){over=true;$('canvasGameStatus').textContent='CRASH DETECTED. Restart to race again.';}score+=Math.floor(dt); }
+        traffic.forEach(t=>{ctx.fillStyle='#ff647c';ctx.shadowBlur=10;ctx.shadowColor='#ff647c';ctx.fillRect(178+t.lane*130,t.y,34,54);ctx.fillStyle='#200b19';ctx.fillRect(184+t.lane*130,t.y+8,8,8);ctx.fillRect(198+t.lane*130,t.y+8,8,8);});ctx.shadowBlur=15;ctx.shadowColor='#7bffdf';ctx.fillStyle='#7bffdf';ctx.fillRect(178+playerLane*130,H-85,34,54);ctx.shadowBlur=0;
+      }
+      if(over){ctx.fillStyle='rgba(0,4,12,.65)';ctx.fillRect(0,0,W,H);ctx.fillStyle='#e7fcff';ctx.textAlign='center';ctx.font='bold 28px Orbitron, sans-serif';ctx.fillText('SIMULATION ENDED',W/2,H/2);ctx.font='18px Rajdhani, sans-serif';ctx.fillText('SCORE '+score+' · PRESS RESTART',W/2,H/2+32);}
+      $('canvasGameScore').textContent='SCORE '+score;
+      arcadeCanvasFrame=requestAnimationFrame(draw);
+    };
+    $('canvasGameRestart').onclick=()=>arcadeStartCanvasGame(kind);
+    if(kind==='snake')placeFood();
+    arcadeCanvasFrame=requestAnimationFrame(draw);
+  }
 
   // ---- Space Defender: lightweight canvas arcade game, self-contained in the Arcade Hub.
   let spaceState=null, spaceFrame=0, spaceLast=0;
