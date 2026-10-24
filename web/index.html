@@ -21,6 +21,21 @@
     --accent: var(--cyan);
   }
   body.mode-egirl { --bg: #160b19; --cyan: #ff8bda; --glow: rgba(255,139,218,.38); --accent: #ff8bda; --panel: rgba(40,13,40,.62); }
+  body.mode-egirl::before { background-image: linear-gradient(rgba(255,139,218,.055) 1px, transparent 1px), linear-gradient(90deg, rgba(255,139,218,.055) 1px, transparent 1px); }
+  body.mode-egirl .reactor { filter: drop-shadow(0 0 18px rgba(255,139,218,.18)); }
+  body.mode-egirl.state-speaking .r1 { animation-duration: 8s; opacity: .8; }
+  body.mode-egirl.state-speaking .r3 { animation: egirlPulse 1.1s ease-in-out infinite; }
+  body.mode-egirl .log { border-color: rgba(255,139,218,.28); box-shadow: 0 0 24px rgba(255,139,218,.07); }
+  .fun-hud { display:none; position:fixed; right:18px; bottom:18px; z-index:4; padding:8px 12px; border:1px solid rgba(63,216,255,.24); border-radius:999px; background:rgba(3,12,22,.72); color:var(--muted); font:10px "Orbitron",sans-serif; letter-spacing:.1em; backdrop-filter:blur(10px); }
+  body.mode-egirl .fun-hud { display:block; border-color:rgba(255,139,218,.35); color:#ffc5ec; background:rgba(30,9,31,.78); }
+  body.mode-egirl .fun-hud .spark { display:inline-block; margin-right:5px; animation:sparkle 1.8s ease-in-out infinite; }
+  .fun-hud strong { color:var(--cyan); }
+  .reaction-pop { position:fixed; z-index:6; pointer-events:none; left:50%; top:42%; color:#ff8bda; font-size:22px; text-shadow:0 0 16px rgba(255,139,218,.8); animation:reactionFloat 1.35s ease-out forwards; }
+  @keyframes egirlPulse { 50% { opacity:.72; filter:brightness(1.5); } }
+  @keyframes sparkle { 50% { opacity:.45; transform:scale(1.2) rotate(12deg); } }
+  @keyframes reactionFloat { from { opacity:0; transform:translate(-50%,8px) scale(.7) rotate(-8deg); } 20% { opacity:1; } to { opacity:0; transform:translate(calc(-50% + 22px),-85px) scale(1.3) rotate(14deg); } }
+  @media (max-width:700px) { .fun-hud { right:8px; bottom:8px; font-size:9px; } }
+  @media (prefers-reduced-motion:reduce) { .reaction-pop, .fun-hud .spark { animation:none !important; } }
   * { box-sizing: border-box; }
   html, body { height: 100%; margin: 0; }
   body {
@@ -223,6 +238,7 @@
     <div class="credit">Voice by Fish Audio &middot; Brain by OpenRouter</div>
   </footer>
 
+  <div class="fun-hud" id="funHud"><span class="spark">✦</span> MEMORY <strong id="memoryCount">0</strong> &nbsp;·&nbsp; MISSIONS <strong id="goalCount">0</strong></div>
   <div class="toast" id="toast"></div>
   <audio id="voice"></audio>
 
@@ -239,10 +255,73 @@
   let googleClientId = '';
   let busy = false;
 
+  // Girlfriend-mode memory and goals are stored only in this browser.
+  const MEMORY_KEY = 'jarvis_girlfriend_memories_v1';
+  const GOAL_KEY = 'jarvis_girlfriend_goals_v1';
+  const readLocalList = (key) => { try { const v = JSON.parse(localStorage.getItem(key) || '[]'); return Array.isArray(v) ? v : []; } catch { return []; } };
+  const saveLocalList = (key, list) => { try { localStorage.setItem(key, JSON.stringify(list)); return true; } catch { return false; } };
+  const getMemories = () => readLocalList(MEMORY_KEY).filter(x => typeof x === 'string').slice(0, 20);
+  const getGoals = () => readLocalList(GOAL_KEY).filter(x => x && typeof x.text === 'string').slice(0, 20);
+  function refreshFunHud() {
+    $('memoryCount').textContent = String(getMemories().length);
+    $('goalCount').textContent = String(getGoals().filter(g => !g.done).length);
+  }
+  function popReaction(symbol = '✦') {
+    if (!document.body.classList.contains('mode-egirl')) return;
+    const pop = document.createElement('span'); pop.className = 'reaction-pop'; pop.textContent = symbol;
+    pop.style.left = (42 + Math.random() * 16) + '%'; document.body.append(pop);
+    setTimeout(() => pop.remove(), 1450);
+  }
+  function localGirlfriendCommand(text) {
+    if (!document.body.classList.contains('mode-egirl')) return null;
+    const raw = text.trim(); let m;
+    if ((m = raw.match(/^(?:please\s+)?remember(?:\s+that)?\s+(.+)$/i))) {
+      const item = m[1].trim().slice(0, 180), memories = getMemories();
+      if (memories.some(x => x.toLowerCase() === item.toLowerCase())) return 'Already saved. My memory circuits are awake.';
+      memories.push(item);
+      if (!saveLocalList(MEMORY_KEY, memories.slice(-20))) return 'Browser storage is unavailable, so I could not save that.';
+      refreshFunHud(); return 'Saved in this browser. I can recall it here later; please do not save passwords or sensitive details.';
+    }
+    if (/^(?:what do you remember|show my memories|list memories|what have you remembered)[?.!]*$/i.test(raw)) {
+      const memories = getMemories();
+      return memories.length ? 'Here is what you asked me to remember: ' + memories.map((x,i)=>(i+1)+'. '+x).join('; ') : 'Memory shelf is empty. Say “remember that …” to save a preference or detail.';
+    }
+    if (/^(?:forget my memories|clear my memories|delete my memories)[?.!]*$/i.test(raw)) {
+      try { localStorage.removeItem(MEMORY_KEY); refreshFunHud(); return 'Memory shelf cleared from this browser.'; }
+      catch { return 'I could not clear browser storage. Clear site data in your browser settings.'; }
+    }
+    if ((m = raw.match(/^(?:add (?:a )?goal|my goal is|mission:?)\s+(.+)$/i))) {
+      const item = m[1].trim().slice(0, 160); if (!item) return 'Name the mission and I will add it.';
+      const goals = getGoals();
+      if (goals.some(g => g.text.toLowerCase() === item.toLowerCase() && !g.done)) return 'That mission is already on the board. No duplicate quests.';
+      goals.push({text:item, done:false, created:Date.now()});
+      if (!saveLocalList(GOAL_KEY, goals.slice(-20))) return 'Browser storage is unavailable, so I could not save that mission.';
+      refreshFunHud(); return 'Mission added: ' + item + '. Tiny steps, main-character energy.';
+    }
+    if (/^(?:show|list|what are) (?:my )?(?:goals|missions|quests)[?.!]*$/i.test(raw)) {
+      const goals = getGoals();
+      return goals.length ? 'Mission board: ' + goals.map((g,i)=>(i+1)+'. '+(g.done?'Completed: ':'Open: ')+g.text).join('; ') : 'No missions yet. Say “add goal …” to put one on the board.';
+    }
+    if ((m = raw.match(/^(?:complete|finish|done with) (?:goal|mission|quest)\s+(.+)$/i))) {
+      const target=m[1].trim().toLowerCase(), goals=getGoals();
+      const found=goals.find(g=>!g.done&&(g.text.toLowerCase()===target||g.text.toLowerCase().includes(target)));
+      if (!found) return 'I could not find an open mission with that name. Say “show goals” to check the board.';
+      found.done=true; if(!saveLocalList(GOAL_KEY,goals)) return 'I could not update browser storage.';
+      refreshFunHud(); popReaction('★'); return 'Mission complete: '+found.text+'. That is a real win—take the credit.';
+    }
+    if (/^(?:forget|delete|remove) (?:goal|mission|quest)\s+(.+)$/i.test(raw)) {
+      const target=raw.replace(/^(?:forget|delete|remove) (?:goal|mission|quest)\s+/i,'').trim().toLowerCase();
+      const goals=getGoals(), kept=goals.filter(g=>g.text.toLowerCase()!==target);
+      if(kept.length===goals.length) return 'Could not find that exact mission. Say “show goals” to see the list.';
+      saveLocalList(GOAL_KEY,kept); refreshFunHud(); return 'Mission removed. The board has been updated.';
+    }
+    return null;
+  }
+
   function setState(state) {
     document.body.classList.remove('state-idle', 'state-listening', 'state-thinking', 'state-speaking');
     document.body.classList.add('state-' + state);
-    statusEl.textContent = LABELS[state];
+    statusEl.textContent = document.body.classList.contains('mode-egirl') && state === 'idle' ? 'Ready for mischief' : LABELS[state];
   }
 
   function addLine(cls, who, text) {
@@ -285,6 +364,7 @@
       protocols = Array.isArray(s.protocols) ? s.protocols : [];
       googleClientId = s.google_client_id || '';
       document.body.classList.toggle('mode-egirl', s.mode === 'egirl');
+      refreshFunHud();
       $('dotVoice').className = 'dot ' + (s.voice ? 'on' : 'off');
       $('dotBrain').className = 'dot ' + (s.brain ? 'on' : 'off');
       if (!s.brain) toast('No brain key yet. Add your OpenRouter key to the .env file and restart JARVIS.');
@@ -487,6 +567,10 @@
     if (pendingSpeech.trim()) queueSpeech(pendingSpeech.trim());
     if (streamError && !replyEl.textContent) replyEl.textContent = streamError;
     if (!replyEl.textContent) replyEl.textContent = streamError || 'I did not receive a reply.';
+    if (document.body.classList.contains('mode-egirl') && !streamError) {
+      if (/\b(thank you|thanks|awesome|great|nice|done|finished|perfect)\b/i.test(replyEl.textContent)) popReaction('✦');
+      else if (Math.random() < 0.28) popReaction('♡');
+    }
     busy = false;
     if (streamError) toast(streamError);
     await speechQueue;
@@ -687,11 +771,25 @@
   async function send(text) {
     text = text.trim();
     if (!text || busy) return;
+    if (/^(?:please\s+)?activate girlfriend mode[.!?]*$/i.test(text)) document.body.classList.add('mode-egirl');
+    if (/^(?:please\s+)?activate jarvis mode[.!?]*$/i.test(text)) document.body.classList.remove('mode-egirl');
     busy = true;
     stopSpeaking();
     showExchange(text, '');
     setState('thinking');
     const replyEl = addLine('jarvis', 'JARVIS', '...');
+    const localReply = localGirlfriendCommand(text);
+    if (localReply !== null) {
+      replyEl.textContent = localReply; busy = false;
+      if (/saved|added|complete|cleared/i.test(localReply)) popReaction(/complete/i.test(localReply) ? '★' : '✦');
+      void speak(localReply); setState('idle'); return;
+    }
+    if (document.body.classList.contains('mode-egirl')) {
+      const memories = getMemories();
+      if (memories.length && !/^(?:remember|show my memories|what do you remember|forget my memories|add (?:a )?goal|my goal is|mission:|show goals|list goals|complete goal|finish goal)/i.test(text)) {
+        text = 'Context the user explicitly asked me to remember (browser-local notes): ' + memories.join(' | ') + '\nUser message: ' + text;
+      }
+    }
     const requestsMail = /\b(?:activate|start|enable|turn\s+on)\s+work\s+mode\b|\b(?:check|read|summari[sz]e|review|show|fetch|retrieve|look\s+at)\b.*\b(?:e-?mails?|mails?|messages?|inbox)\b|\b(?:e-?mails?|mails?|messages?|inbox)\b.*\b(?:check|read|summari[sz]e|review|show|fetch|retrieve)\b/i.test(text);
     // Start OAuth while this is still directly inside the user's click/key action;
     // browsers may block the Google consent popup if we wait for the server first.
