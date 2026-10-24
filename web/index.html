@@ -1439,7 +1439,7 @@
   const arcadeStage = $('arcadeStage');
   let arcadeReactionTimer = null, arcadeReactionStarted = 0, arcadeReactionReady = false;
   let arcadeMemorySequence = [], arcadeMemoryInput = [], arcadeMemoryLocked = false, arcadeMemoryRound = 0;
-  let arcadeCode = '', arcadeCodeAttempts = 0;
+  let arcadeCode = '', arcadeCodeAttempts = 0, arcadeMathTimer = null;
 
   function arcadeOpen() {
     arcadeOverlay.classList.add('open');
@@ -1453,6 +1453,7 @@
     arcadeReactionReady=false;
   }
   function arcadeHome() {
+    if (arcadeMathTimer) { clearInterval(arcadeMathTimer); arcadeMathTimer=null; }
     if (arcadeReactionTimer) { clearTimeout(arcadeReactionTimer); arcadeReactionTimer=null; }
     arcadeReactionReady=false;
     arcadeGrid.hidden=false;
@@ -1465,6 +1466,7 @@
     arcadeStage.innerHTML='<h3>'+title+'</h3>'+body;
   }
   function arcadeLaunch(name) {
+    if (arcadeMathTimer) { clearInterval(arcadeMathTimer); arcadeMathTimer=null; }
     if (name==='chess') { arcadeClose(); chessOpen(); return; }
     if (name==='space') { arcadeStartSpaceDefender(); return; }
     if (name==='escape') { arcadeStartCyberEscape(); return; }
@@ -1527,12 +1529,12 @@
       $('tttRestart').onclick=()=>arcadeLaunch('tictactoe');render();return;
     }
     if (name==='mathblitz') {
-      let score=0,left=30,active=false,timer=null,answer=0;
+      let score=0,left=30,active=false,answer=0;
       const question=()=>{const a=1+Math.floor(Math.random()*12),b=1+Math.floor(Math.random()*12),op=['+','−','×'][Math.floor(Math.random()*3)];answer=op==='+'?a+b:op==='−'?a-b:a*b;$('mathQuestion').textContent=a+' '+op+' '+b+' = ?';$('mathAnswer').value='';$('mathAnswer').focus();};
       arcadeStageView('MATH BLITZ','<div class="arcade-status" id="mathStatus">You have 30 seconds. Solve quickly!</div><div id="mathQuestion" style="text-align:center;font:700 34px Orbitron,sans-serif;color:#7bffdf;margin:24px 0">READY?</div><div class="arcade-controls" style="justify-content:center"><input class="arcade-input" id="mathAnswer" inputmode="numeric" placeholder="ANSWER" aria-label="Math answer"><button class="chess-btn" id="mathSubmit" type="button">SUBMIT</button></div><div class="arcade-controls" style="justify-content:center"><span class="arcade-small" id="mathScore">SCORE 0</span><span class="arcade-small" id="mathTime">TIME 30s</span></div><div class="arcade-controls"><button class="chess-btn" id="mathStart" type="button">START BLITZ</button><button class="chess-btn" type="button" data-arcade-back>BACK TO HUB</button></div>');
       const submit=()=>{if(!active)return;if(Number($('mathAnswer').value)===answer){score++;$('mathStatus').textContent='Correct! Keep going.';}else $('mathStatus').textContent='Not quite — the answer was '+answer+'.';$('mathScore').textContent='SCORE '+score;question();};
       $('mathSubmit').onclick=submit;$('mathAnswer').onkeydown=e=>{if(e.key==='Enter')submit();};
-      $('mathStart').onclick=()=>{if(timer)clearInterval(timer);score=0;left=30;active=true;$('mathStart').disabled=true;$('mathScore').textContent='SCORE 0';question();timer=setInterval(()=>{left--;$('mathTime').textContent='TIME '+left+'s';if(left<=0){clearInterval(timer);timer=null;active=false;$('mathStart').disabled=false;$('mathStart').textContent='PLAY AGAIN';$('mathStatus').textContent='Time up! Final score: '+score+'.';$('mathQuestion').textContent='BLITZ COMPLETE';}},1000);};return;
+      $('mathStart').onclick=()=>{if(arcadeMathTimer)clearInterval(arcadeMathTimer);score=0;left=30;active=true;$('mathStart').disabled=true;$('mathScore').textContent='SCORE 0';question();arcadeMathTimer=setInterval(()=>{left--;$('mathTime').textContent='TIME '+left+'s';if(left<=0){clearInterval(arcadeMathTimer);arcadeMathTimer=null;active=false;$('mathStart').disabled=false;$('mathStart').textContent='PLAY AGAIN';$('mathStatus').textContent='Time up! Final score: '+score+'.';$('mathQuestion').textContent='BLITZ COMPLETE';}},1000);};return;
     }
     if (name==='numberhunt') {
       let secret=1+Math.floor(Math.random()*100),tries=0,done=false;
