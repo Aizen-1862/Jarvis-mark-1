@@ -394,89 +394,79 @@
     const {THREE}=chess3d;
     const classic=chessOverlay.classList.contains('chess-theme-classic');
     const white=color==='w';
-    const material=new THREE.MeshStandardMaterial({
-      color:classic?(white?0xf4dfb5:0x302117):(white?0xe8fdff:0x36cfff),
-      metalness:classic?(white?.16:.1):.72,
-      roughness:classic?.3:.2,
-      emissive:classic?(white?0x241405:0x100904):(white?0x43dfff:0x008dca),
-      emissiveIntensity:classic?.035:(white?.58:.92)
+    const body=new THREE.MeshStandardMaterial({
+      color:classic?(white?0xf3dfbb:0x302117):(white?0xe7fcff:0x19bfe9),
+      metalness:classic?.18:.62, roughness:classic?.32:.24,
+      emissive:classic?(white?0x211306:0x100804):(white?0x27bddd:0x00658d),
+      emissiveIntensity:classic?.025:(white?.36:.58)
     });
-    const accent=new THREE.MeshStandardMaterial({
-      color:classic?(white?0xffedcc:0x9c744a):(white?0xffffff:0x8af5ff),
-      metalness:classic?.22:.78,roughness:classic?.24:.18,
-      emissive:classic?0x120900:0x18cfff,
-      emissiveIntensity:classic?.015:.5
+    const trim=new THREE.MeshStandardMaterial({
+      color:classic?(white?0xffedcc:0x9c744a):(white?0xffffff:0x83f1ff),
+      metalness:classic?.22:.68, roughness:classic?.26:.2,
+      emissive:classic?0x100700:0x12aaca,
+      emissiveIntensity:classic?.01:.3
     });
     const group=new THREE.Group();
-    const mesh=(geometry,mat=material,x=0,y=0,z=0,rx=0,ry=0,rz=0)=>{
-      const m=new THREE.Mesh(geometry,mat);m.position.set(x,y,z);m.rotation.set(rx,ry,rz);
-      m.castShadow=true;m.receiveShadow=true;group.add(m);return m;
-    };
-    const cyl=(rTop,rBottom,h,y,mat=material,segments=32)=>mesh(new THREE.CylinderGeometry(rTop,rBottom,h,segments),mat,0,y,0);
-    const ball=(r,y,mat=material,x=0,z=0)=>mesh(new THREE.SphereGeometry(r,24,16),mat,x,y,z);
-    const ring=(r,t,y,mat=accent)=>mesh(new THREE.TorusGeometry(r,t,10,32),mat,0,y,0,Math.PI/2,0,0);
-    const lathe=(profile,mat=material,segments=40)=>mesh(new THREE.LatheGeometry(profile.map(p=>new THREE.Vector2(p[0],p[1])),segments),mat);
-    const turnedBase=()=>{
-      lathe([[.12,.035],[.24,.045],[.29,.075],[.30,.105],[.28,.13],[.22,.15],[.20,.18],[.22,.205],[.22,.23],[.17,.255],[.145,.29],[.13,.32]]);
-      ring(.255,.018,.105);
-    };
-    const stem=(top=.13,bottom=.16,height=.27,y=.45)=>lathe([
-      [bottom,y-height/2],[bottom*.96,y-height*.35],[bottom*.74,y-height*.18],
-      [top*1.12,y],[top*.98,y+height*.25],[top,y+height/2]
-    ]);
-    turnedBase();
+    function add(geometry,mat,x,y,z,rx=0,ry=0,rz=0){
+      const m=new THREE.Mesh(geometry,mat);
+      m.position.set(x||0,y||0,z||0); m.rotation.set(rx||0,ry||0,rz||0);
+      m.castShadow=true; m.receiveShadow=true; group.add(m); return m;
+    }
+    function cylinder(rt,rb,h,y,mat=body,n=32){return add(new THREE.CylinderGeometry(rt,rb,h,n),mat,0,y,0);}
+    function sphere(r,x,y,z,mat=body){return add(new THREE.SphereGeometry(r,24,16),mat,x,y,z);}
+    function cone(r,h,y,mat=body,n=32){return add(new THREE.ConeGeometry(r,h,n),mat,0,y,0);}
+    function ring(r,t,y,mat=trim){return add(new THREE.TorusGeometry(r,t,8,28),mat,0,y,0,Math.PI/2,0,0);}
+    // Simple, stable turned silhouette shared by every piece.
+    cylinder(.25,.29,.07,.07,trim);
+    cylinder(.22,.25,.07,.14);
+    cylinder(.17,.20,.08,.215,trim);
+    cylinder(.125,.16,.10,.30);
     if(type==='p'){
-      stem(.095,.145,.30,.455);
-      lathe([[.10,.58],[.13,.60],[.145,.63],[.13,.66],[.105,.69],[.08,.71]]);
-      ball(.135,.825,accent);
-      ring(.135,.014,.69);
+      cylinder(.105,.135,.25,.475);
+      cylinder(.12,.105,.055,.625,trim);
+      sphere(.13,0,.77,0,trim);
     } else if(type==='r'){
-      stem(.16,.17,.32,.46);
-      lathe([[.16,.61],[.21,.64],[.22,.68],[.27,.70],[.27,.78],[.22,.80],[.22,.84]]);
-      cyl(.235,.235,.10,.86,accent);
-      for(let i=0;i<8;i++){
-        const a=i*Math.PI/4;
-        mesh(new THREE.BoxGeometry(.105,.13,.10),accent,Math.cos(a)*.18,.955,Math.sin(a)*.18);
+      cylinder(.16,.145,.32,.49);
+      cylinder(.215,.16,.07,.675,trim);
+      cylinder(.24,.24,.07,.735);
+      const block=new THREE.BoxGeometry(.095,.12,.095);
+      for(let j=0;j<8;j++){
+        const a=j*Math.PI/4;
+        add(block,trim,Math.cos(a)*.17,.82,Math.sin(a)*.17);
       }
     } else if(type==='n'){
-      stem(.14,.17,.23,.42);
-      // A horse-head silhouette, extruded toward the viewer, instead of a cone-shaped placeholder.
-      const shape=new THREE.Shape();
-      shape.moveTo(-.16,.31); shape.quadraticCurveTo(-.22,.43,-.17,.55);
-      shape.lineTo(-.12,.66); shape.quadraticCurveTo(-.10,.77,-.035,.88);
-      shape.lineTo(.015,.82); shape.lineTo(.12,.87);
-      shape.quadraticCurveTo(.17,.82,.12,.75);
-      shape.lineTo(.075,.70); shape.quadraticCurveTo(.19,.66,.18,.57);
-      shape.lineTo(.13,.48); shape.quadraticCurveTo(.09,.40,.12,.31);
-      shape.closePath();
-      mesh(new THREE.ExtrudeGeometry(shape,{depth:.12,bevelEnabled:true,bevelSegments:3,steps:1,bevelSize:.025,bevelThickness:.025}),material,0,0,.015);
-      ball(.025,.735,accent,.055,.145);
-      // Mane ridge and muzzle highlight make the knight read clearly from the angled camera.
-      mesh(new THREE.BoxGeometry(.055,.28,.035),accent,-.12,.68,.085,0,0,-.18);
-      mesh(new THREE.SphereGeometry(.055,16,12),accent,.105,.555,.12);
+      // A clean sculpted horse profile built from standard, reliable meshes.
+      cylinder(.15,.16,.24,.43);
+      add(new THREE.SphereGeometry(.145,20,16),body,-.015,.59,0,0,0,-.28);
+      add(new THREE.ConeGeometry(.12,.34,20),body,.035,.73,-.045,0,0,-.38);
+      sphere(.065,.09,.82,-.06,trim);
+      add(new THREE.ConeGeometry(.055,.15,16),trim,.08,.91,-.09,0,0,-.28);
+      sphere(.022,.145,.82,.035,trim);
+      add(new THREE.BoxGeometry(.045,.23,.06),trim,-.105,.69,.02,0,0,-.22);
     } else if(type==='b'){
-      stem(.135,.17,.25,.425);
-      lathe([[.14,.55],[.17,.59],[.18,.64],[.145,.69],[.11,.74],[.085,.80],[.055,.86],[.025,.91]]);
-      ball(.045,.925,accent);
-      // The bishop's diagonal mitre cut is a visible gold/cyan slash.
-      mesh(new THREE.BoxGeometry(.20,.025,.035),accent,0,.765,.07,0,0,-.68);
+      cylinder(.145,.16,.20,.41);
+      cone(.18,.31,.655);
+      cylinder(.115,.18,.07,.80,trim);
+      sphere(.075,0,.88,0,trim);
+      cone(.035,.12,.975,trim);
+      add(new THREE.BoxGeometry(.18,.025,.035),trim,0,.69,.065,0,0,-.62);
     } else if(type==='q'){
-      stem(.145,.18,.26,.43);
-      lathe([[.15,.56],[.19,.60],[.20,.65],[.17,.69],[.21,.73],[.26,.78],[.25,.82],[.20,.85]]);
-      ring(.22,.022,.81);
-      for(let i=0;i<7;i++){
-        const a=i*Math.PI*2/7;
-        const x=Math.cos(a)*.19,z=Math.sin(a)*.19;
-        ball(.052,.91,accent,x,z);
+      cylinder(.15,.17,.20,.41);
+      cone(.20,.30,.64);
+      cylinder(.22,.22,.065,.79,trim);
+      ring(.19,.018,.835,trim);
+      for(let j=0;j<7;j++){
+        const a=j*Math.PI*2/7;
+        sphere(.045,Math.cos(a)*.17,.91,Math.sin(a)*.17,trim);
       }
-      ball(.065,.875,accent);
+      sphere(.055,0,.875,0,trim);
     } else if(type==='k'){
-      stem(.15,.19,.27,.435);
-      lathe([[.15,.57],[.19,.61],[.21,.66],[.18,.71],[.22,.76],[.27,.81],[.25,.85],[.20,.88]]);
-      ring(.22,.022,.835);
-      cyl(.038,.045,.27,1.015,accent,16);
-      mesh(new THREE.BoxGeometry(.24,.055,.065),accent,0,1.07,0);
-      ball(.045,1.16,accent);
+      cylinder(.155,.18,.22,.42);
+      cone(.20,.32,.65);
+      cylinder(.22,.22,.065,.81,trim);
+      cylinder(.035,.04,.24,1.00,trim,16);
+      add(new THREE.BoxGeometry(.20,.05,.055),trim,0,1.035,0);
+      sphere(.04,0,1.145,0,trim);
     }
     return group;
   }
