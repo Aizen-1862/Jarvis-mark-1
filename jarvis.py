@@ -172,10 +172,8 @@ def system_prompt(cfg: dict[str, str]) -> str:
         "For current scores, career totals, prices, weather, news, schedules, or other changing facts, "
         "use live web search when available, distinguish sourced facts from estimates, and never invent precise numbers. "
         "When web search results are available, use them for current facts and be clear about uncertainty. "
-        "You cannot read email unless the app explicitly reports that Gmail was connected and returned messages. "
-        "inspect web pages, run arbitrary commands, or access local files. Never claim an action "
-        "was done unless a tool result confirms it succeeded. Never use tools for actions the user "
-        "did not request. If a request needs an unavailable capability, say so directly. "
+        "You cannot inspect arbitrary web pages or execute arbitrary shell commands. Available local workspace tools can list folders, read supported text/code files, create folders, and create new text/code files only within the user's home directory; never read or expose credentials, API keys, password files, .env files, or private-key files. "
+        "Never overwrite, delete, install software, or run scripts. Never claim an action was done unless a tool result confirms it succeeded. Never use tools for actions the user did not request. If a request needs an unavailable capability, say so directly. "
         f"The local date and time is {time.strftime('%A, %B %d, %Y, %I:%M %p')}."
     )
 
@@ -292,7 +290,94 @@ AGENT_TOOLS = [{
             "additionalProperties": False,
         },
     },
+}, {
+    "type": "function",
+    "function": {
+        "name": "list_directory",
+        "description": "List the immediate contents of a folder inside the user's Windows home directory. Use this to inspect a project folder before acting.",
+        "parameters": {
+            "type": "object",
+            "properties": {"path": {"type": "string", "description": "Folder path, absolute or relative to the user's home directory"}},
+            "required": ["path"],
+            "additionalProperties": False,
+        },
+    },
+}, {
+    "type": "function",
+    "function": {
+        "name": "read_text_file",
+        "description": "Read a supported text or source-code file inside the user's Windows home directory. Never use for secrets, .env files, credentials, or private keys.",
+        "parameters": {
+            "type": "object",
+            "properties": {"path": {"type": "string", "description": "File path, absolute or relative to the user's home directory"}},
+            "required": ["path"],
+            "additionalProperties": False,
+        },
+    },
+}, {
+    "type": "function",
+    "function": {
+        "name": "create_folder",
+        "description": "Create a new folder inside the user's Windows home directory. Do not use if the folder already exists.",
+        "parameters": {
+            "type": "object",
+            "properties": {"path": {"type": "string", "description": "New folder path, absolute or relative to the user's home directory"}},
+            "required": ["path"],
+            "additionalProperties": False,
+        },
+    },
+}, {
+    "type": "function",
+    "function": {
+        "name": "create_text_file",
+        "description": "Create a new text or source-code file inside the user's Windows home directory. This tool never overwrites an existing file. Do not create scripts intended to run destructive actions.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "path": {"type": "string", "description": "New file path, absolute or relative to the user's home directory"},
+                "content": {"type": "string", "description": "Complete contents of the new file"}
+            },
+            "required": ["path", "content"],
+            "additionalProperties": False,
+        },
+    },
 }]
+
+
+def _workspace_path(raw_path: object) -> tuple[Path | None, str | None]:
+    """Resolve a path under the local user's home and reject sensitive locations."""
+    if os.environ.get("JARVIS_HOST", "127.0.0.1").strip() not in ("127.0.0.1", "::1", "localhost"):
+        return None, "Local workspace tools are disabled when JARVIS is hosted remotely."
+    raw = str(raw_path or "").strip()
+    if not raw or len(raw) > 1024:
+        return None, "Provide a valid file or folder path."
+    home = Path.home().resolve()
+    candidate = Path(raw).expanduser()
+    if not candidate.is_absolute():
+        candidate = home / candidate
+    try:
+        resolved = candidate.resolve(strict=False)
+        resolved.relative_to(home)
+    except (OSError, RuntimeError, ValueError):
+        return None, "For safety, I can only access paths inside your user home folder."
+    blocked = {".ssh", ".gnupg", ".aws", ".azure", "credentials", "secrets", "appdata"}
+    if any(part.casefold() in blocked for part in resolved.parts):
+        return None, "That location is restricted because it may contain private data."
+    if any(part.casefold() in (".git",) for part in resolved.parts):
+        return None, "Direct access to Git metadata is disabled."
+    if resolved.name.casefold() in (".env", ".env.local", ".env.production", "id_rsa", "id_ed25519", "credentials.json", "secrets.json"):
+        return None, "That file is restricted because it may contain credentials."
+    if resolved.suffix.casefold() in (".pem", ".key", ".p12", ".pfx", ".kdb", ".keystore"):
+        return None, "Private-key and certificate files are restricted."
+    return resolved, None
+
+
+_TEXT_SUFFIXES = {
+    ".txt", ".md", ".rst", ".py", ".js", ".mjs", ".cjs", ".ts", ".tsx", ".jsx",
+    ".html", ".htm", ".css", ".json", ".csv", ".yaml", ".yml", ".toml", ".ini",
+    ".cfg", ".conf", ".xml", ".sql", ".bat", ".cmd", ".ps1", ".log", ".java",
+    ".c", ".h", ".cpp", ".hpp", ".go", ".rs", ".php", ".rb", ".sh",
+}
 
 
 def run_agent_tool(name: str, raw_arguments: str) -> dict:
@@ -323,6 +408,66 @@ def run_agent_tool(name: str, raw_arguments: str) -> dict:
         if not app or len(app) > 100 or not re.fullmatch(r"[\w .&()+-]+", app, re.UNICODE):
             return {"ok": False, "error": "Give me the app's display name, not a command or file path."}
         return {"ok": True, "action": f"request launch of {app}", "launch_app": app}
+
+    if name in ("list_directory", "read_text_file", "create_folder", "create_text_file"):
+        path, problem = _workspace_path(args.get("path"))
+        if problem:
+            return {"ok": False, "error": problem}
+        assert path is not None
+        if name == "list_directory":
+            if not path.exists() or not path.is_dir():
+                return {"ok": False, "error": "That folder does not exist or is not a folder."}
+            try:
+                entries = sorted(path.iterdir(), key=lambda item: (not item.is_dir(), item.name.casefold()))
+                visible = []
+                for item in entries:
+                    if item.name.startswith(".") or item.name.casefold() in ("appdata", ".git"):
+                        continue
+                    visible.append({"name": item.name[:160], "type": "folder" if item.is_dir() else "file"})
+                    if len(visible) >= 80:
+                        break
+                return {"ok": True, "action": f"listed folder {path}", "path": str(path), "entries": visible, "truncated": len(entries) > len(visible)}
+            except OSError as err:
+                return {"ok": False, "error": f"I couldn't list that folder: {err}"}
+
+        if name == "read_text_file":
+            if not path.exists() or not path.is_file():
+                return {"ok": False, "error": "That file does not exist."}
+            if path.suffix.casefold() not in _TEXT_SUFFIXES:
+                return {"ok": False, "error": "For safety, I can only read supported text and source-code files."}
+            try:
+                if path.stat().st_size > 150_000:
+                    return {"ok": False, "error": "That file is over 150 KB. Please choose a smaller text file."}
+                content = path.read_text(encoding="utf-8")
+                return {"ok": True, "action": f"read file {path}", "path": str(path), "content": content[:150_000], "truncated": len(content) > 150_000}
+            except (OSError, UnicodeError) as err:
+                return {"ok": False, "error": f"I couldn't read that text file: {err}"}
+
+        if name == "create_folder":
+            if path.exists():
+                return {"ok": False, "error": "That path already exists; I will not overwrite anything."}
+            try:
+                path.mkdir(parents=True, exist_ok=False)
+                return {"ok": True, "action": f"created folder {path}", "path": str(path)}
+            except OSError as err:
+                return {"ok": False, "error": f"I couldn't create that folder: {err}"}
+
+        if name == "create_text_file":
+            if path.suffix.casefold() not in _TEXT_SUFFIXES:
+                return {"ok": False, "error": "Use a supported text or source-code extension, such as .txt, .md, .py, .js, .html, or .css."}
+            content = args.get("content")
+            if not isinstance(content, str) or len(content.encode("utf-8")) > 60_000:
+                return {"ok": False, "error": "File content must be text no larger than 60 KB."}
+            if not path.parent.exists() or not path.parent.is_dir():
+                return {"ok": False, "error": "The parent folder doesn't exist. Create the folder first."}
+            try:
+                with path.open("x", encoding="utf-8", newline="") as file:
+                    file.write(content)
+                return {"ok": True, "action": f"created file {path}", "path": str(path), "bytes": len(content.encode("utf-8"))}
+            except FileExistsError:
+                return {"ok": False, "error": "That file already exists. I will not overwrite it."}
+            except OSError as err:
+                return {"ok": False, "error": f"I couldn't create that file: {err}"}
 
     return {"ok": False, "error": "That action is not available."}
 
