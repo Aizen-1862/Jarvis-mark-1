@@ -260,6 +260,36 @@
   .chess-theme-classic .chess-status,.chess-theme-classic .chess-moves {background:#241d16;border-color:#624a31;color:#e9d3b4}
   @media(max-width:680px){.chess-overlay{padding:8px;align-items:flex-start}.chess-panel{padding:12px;max-height:calc(100vh - 16px)}.chess-layout{grid-template-columns:1fr}.chess-side{gap:8px}.chess-moves{height:95px}.chess-square{font-size:clamp(22px,9vw,42px)}}
 
+
+  /* JARVIS Arcade Hub */
+  .arcade-launch { color:#7bffdf;background:rgba(5,24,31,.55);border:1px solid rgba(123,255,223,.48);box-shadow:0 0 14px rgba(123,255,223,.08); }
+  .arcade-launch:hover { box-shadow:0 0 18px rgba(123,255,223,.22); }
+  .arcade-overlay { position:fixed;inset:0;z-index:40;display:none;align-items:center;justify-content:center;padding:18px;background:rgba(0,4,11,.9);backdrop-filter:blur(14px);overflow:auto; }
+  .arcade-overlay.open { display:flex; }
+  .arcade-panel { width:min(1080px,100%);max-height:calc(100vh - 36px);overflow:auto;padding:22px;background:linear-gradient(145deg,rgba(5,22,34,.98),rgba(3,9,20,.98));border:1px solid rgba(123,255,223,.42);border-radius:18px;box-shadow:0 0 55px rgba(63,216,255,.12);color:var(--text); }
+  .arcade-head { display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:20px; }
+  .arcade-title { font:700 clamp(20px,3vw,28px) Orbitron,sans-serif;letter-spacing:.12em;color:#7bffdf;text-shadow:0 0 18px rgba(123,255,223,.25); }
+  .arcade-kicker { margin-top:7px;font-size:13px;letter-spacing:.12em;color:var(--muted); }
+  .arcade-grid { display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px; }
+  .arcade-card { min-height:190px;text-align:left;display:flex;flex-direction:column;align-items:flex-start;gap:10px;padding:18px;border:1px solid rgba(63,216,255,.23);border-radius:14px;background:linear-gradient(145deg,rgba(10,36,51,.76),rgba(4,14,25,.85));color:var(--text);font-family:inherit;letter-spacing:normal;transition:transform .18s,border-color .18s,box-shadow .18s; }
+  .arcade-card:hover { transform:translateY(-3px);border-color:#7bffdf;box-shadow:0 0 22px rgba(123,255,223,.12); }
+  .arcade-icon { font-size:32px;line-height:1.2;filter:drop-shadow(0 0 10px rgba(63,216,255,.3)); }
+  .arcade-card strong { font:700 14px Orbitron,sans-serif;letter-spacing:.07em;color:#bff9ff; }
+  .arcade-card span:last-child { font-size:15px;line-height:1.35;color:#91b4c4; }
+  .arcade-tag { margin-top:auto;font:10px Orbitron,sans-serif;letter-spacing:.12em;color:#7bffdf; }
+  .arcade-stage { margin-top:18px;padding:18px;border:1px solid rgba(123,255,223,.22);border-radius:14px;background:rgba(2,12,21,.7); }
+  .arcade-stage h3 { margin:0 0 8px;font:700 17px Orbitron,sans-serif;letter-spacing:.08em;color:#7bffdf; }
+  .arcade-stage p { color:#9cb9c7; }
+  .arcade-controls { display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:12px; }
+  .arcade-status { min-height:24px;color:#c8faff;font-size:17px; }
+  .matrix-grid { display:grid;grid-template-columns:repeat(4,minmax(42px,64px));gap:8px;justify-content:center;margin:18px auto; }
+  .matrix-tile { aspect-ratio:1;border:1px solid rgba(63,216,255,.45);border-radius:9px;background:rgba(10,40,58,.9);box-shadow:inset 0 0 12px rgba(63,216,255,.05);padding:0; }
+  .matrix-tile.lit { background:#7bffdf;border-color:#d8fff5;box-shadow:0 0 22px rgba(123,255,223,.75); }
+  .arcade-input { width:min(220px,100%);padding:10px 12px;border:1px solid rgba(123,255,223,.4);border-radius:8px;background:#04121d;color:#e1fbff;font:600 20px Orbitron,sans-serif;letter-spacing:.2em; }
+  .arcade-small { font-size:12px;color:#6f93a6;letter-spacing:.05em; }
+  @media(max-width:760px){.arcade-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.arcade-panel{padding:14px}.arcade-card{min-height:170px;padding:14px}}
+  @media(max-width:480px){.arcade-grid{grid-template-columns:1fr}.arcade-card{min-height:130px}.arcade-overlay{padding:8px}.arcade-panel{max-height:calc(100vh - 16px)}}
+
 </style>
 </head>
 <body class="state-idle">
@@ -270,7 +300,7 @@
       <span class="pill"><span class="dot" id="dotVoice"></span>VOICE &middot; FISH AUDIO</span>
       <span class="pill"><span class="dot" id="dotBrain"></span>BRAIN &middot; OPENROUTER</span>
     </div>
-    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap"><button class="chess-launch" id="chessShortcut" type="button">CHESS ♟</button><a href="/lab.html" style="color:#3fd8ff;text-decoration:none;border:1px solid rgba(63,216,255,.35);border-radius:5px;padding:7px 10px;font-size:11px;letter-spacing:.08em">3D LEARNING LAB ↗</a><div id="clock"></div></div>
+    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap"><button class="chess-launch arcade-launch" id="arcadeShortcut" type="button">ARCADE ▷</button><button class="chess-launch" id="chessShortcut" type="button">CHESS ♟</button><a href="/lab.html" style="color:#3fd8ff;text-decoration:none;border:1px solid rgba(63,216,255,.35);border-radius:5px;padding:7px 10px;font-size:11px;letter-spacing:.08em">3D LEARNING LAB ↗</a><div id="clock"></div></div>
   </header>
 
   <main>
@@ -319,6 +349,26 @@
           <div style="font:12px Rajdhani,sans-serif;opacity:.7">Voice: “play chess”, “new chess game”, “undo chess move”, “switch chess theme”, or say a move like “e2 to e4”.</div>
         </div>
       </div>
+    </section>
+  </div>
+
+
+  <div class="arcade-overlay" id="arcadeOverlay" aria-hidden="true">
+    <section class="arcade-panel" role="dialog" aria-modal="true" aria-label="JARVIS Arcade">
+      <div class="arcade-head">
+        <div><div class="arcade-title">▣ J.A.R.V.I.S. ARCADE</div><div class="arcade-kicker">TACTICAL SIMULATIONS · MINI-GAMES · HIGH SCORES</div></div>
+        <div class="arcade-controls" style="margin-top:0"><button class="chess-btn" id="arcadeHome" type="button">GAME HUB</button><button class="chess-btn" id="arcadeClose" type="button">CLOSE ✕</button></div>
+      </div>
+      <div class="arcade-grid" id="arcadeGrid">
+        <button class="arcade-card" type="button" data-arcade-game="chess"><span class="arcade-icon">♟</span><strong>CHESS PROTOCOL</strong><span>Challenge JARVIS or play local two-player chess.</span><span class="arcade-tag">AVAILABLE NOW</span></button>
+        <button class="arcade-card" type="button" data-arcade-game="reaction"><span class="arcade-icon">⚡</span><strong>REACTION TEST</strong><span>Test your reflexes and beat your personal best.</span><span class="arcade-tag">QUICK CHALLENGE</span></button>
+        <button class="arcade-card" type="button" data-arcade-game="memory"><span class="arcade-icon">▦</span><strong>MEMORY MATRIX</strong><span>Repeat the sequence as the grid gets harder.</span><span class="arcade-tag">NEURAL TRAINING</span></button>
+        <button class="arcade-card" type="button" data-arcade-game="codebreaker"><span class="arcade-icon">⌘</span><strong>CODEBREAKER</strong><span>Crack a four-digit security code using logic.</span><span class="arcade-tag">SECURITY SIMULATION</span></button>
+        <button class="arcade-card" type="button" data-arcade-game="space"><span class="arcade-icon">✦</span><strong>SPACE DEFENDER</strong><span>Incoming simulation slot. A future arcade expansion.</span><span class="arcade-tag">COMING SOON</span></button>
+        <button class="arcade-card" type="button" data-arcade-game="escape"><span class="arcade-icon">⬡</span><strong>CYBER ESCAPE</strong><span>Logic rooms, hidden clues, and timed puzzles.</span><span class="arcade-tag">COMING SOON</span></button>
+      </div>
+      <div class="arcade-stage" id="arcadeStage" hidden></div>
+      <div class="arcade-small" style="margin-top:16px">ARCADE SYSTEM · MORE SIMULATIONS CAN BE ADDED HERE WITHOUT CROWDING THE MAIN HUD</div>
     </section>
   </div>
 
@@ -1368,6 +1418,131 @@
     send(text);
   });
 
+
+  // ---- Arcade Hub: self-contained mini-games; the existing JARVIS HUD and chess remain unchanged.
+  const arcadeOverlay = $('arcadeOverlay');
+  const arcadeGrid = $('arcadeGrid');
+  const arcadeStage = $('arcadeStage');
+  let arcadeReactionTimer = null, arcadeReactionStarted = 0, arcadeReactionReady = false;
+  let arcadeMemorySequence = [], arcadeMemoryInput = [], arcadeMemoryLocked = false, arcadeMemoryRound = 0;
+  let arcadeCode = '', arcadeCodeAttempts = 0;
+
+  function arcadeOpen() {
+    arcadeOverlay.classList.add('open');
+    arcadeOverlay.setAttribute('aria-hidden','false');
+    arcadeHome();
+  }
+  function arcadeClose() {
+    arcadeOverlay.classList.remove('open');
+    arcadeOverlay.setAttribute('aria-hidden','true');
+    if (arcadeReactionTimer) { clearTimeout(arcadeReactionTimer); arcadeReactionTimer=null; }
+    arcadeReactionReady=false;
+  }
+  function arcadeHome() {
+    if (arcadeReactionTimer) { clearTimeout(arcadeReactionTimer); arcadeReactionTimer=null; }
+    arcadeReactionReady=false;
+    arcadeGrid.hidden=false;
+    arcadeStage.hidden=true;
+    arcadeStage.innerHTML='';
+  }
+  function arcadeStageView(title, body) {
+    arcadeGrid.hidden=true;
+    arcadeStage.hidden=false;
+    arcadeStage.innerHTML='<h3>'+title+'</h3>'+body;
+  }
+  function arcadeLaunch(name) {
+    if (name==='chess') { arcadeClose(); chessOpen(); return; }
+    if (name==='space' || name==='escape') {
+      arcadeStageView(name==='space'?'SPACE DEFENDER':'CYBER ESCAPE','<p>This simulation is reserved for a future expansion. The Arcade Hub is ready for more games.</p><div class="arcade-controls"><button class="chess-btn" type="button" data-arcade-back>BACK TO HUB</button></div>');
+      return;
+    }
+    if (name==='reaction') {
+      arcadeStageView('REACTION TEST','<div class="arcade-status" id="reactionStatus">Press START, then wait for the panel to turn green. Click only when it does.</div><div id="reactionPad" style="display:grid;place-items:center;min-height:150px;margin-top:14px;border:1px solid rgba(63,216,255,.3);border-radius:12px;background:rgba(8,34,49,.8);font:700 18px Orbitron,sans-serif;color:#7bffdf;text-align:center;cursor:pointer">READY WHEN YOU ARE</div><div class="arcade-controls"><button class="chess-btn" type="button" id="reactionStart">START TEST</button><span class="arcade-small" id="reactionBest"></span></div><div class="arcade-controls"><button class="chess-btn" type="button" data-arcade-back>BACK TO HUB</button></div>');
+      const best=Number(localStorage.getItem('jarvis_arcade_reaction_best')||0);
+      $('reactionBest').textContent=best?'PERSONAL BEST · '+best+' ms':'NO PERSONAL BEST YET';
+      $('reactionStart').onclick=()=>{
+        if(arcadeReactionTimer)clearTimeout(arcadeReactionTimer);
+        arcadeReactionReady=false;
+        const pad=$('reactionPad'), status=$('reactionStatus');
+        pad.style.background='rgba(110,35,40,.7)';pad.style.color='#ffd1d1';pad.textContent='WAIT FOR GREEN…';
+        status.textContent='Stay ready. Clicking too early resets the test.';
+        $('reactionStart').disabled=true;
+        arcadeReactionTimer=setTimeout(()=>{
+          if(!$('reactionPad'))return;
+          arcadeReactionStarted=performance.now();arcadeReactionReady=true;
+          pad.style.background='rgba(20,105,75,.9)';pad.style.color='#e1fff5';pad.textContent='CLICK NOW!';
+          status.textContent='NOW! Click the green panel!';
+          $('reactionStart').disabled=false;arcadeReactionTimer=null;
+        },1200+Math.random()*2800);
+      };
+      $('reactionPad').onclick=()=>{
+        const pad=$('reactionPad'), status=$('reactionStatus');
+        if(!arcadeReactionReady){
+          if(arcadeReactionTimer){clearTimeout(arcadeReactionTimer);arcadeReactionTimer=null;pad.style.background='rgba(110,35,40,.7)';pad.textContent='TOO EARLY — TRY AGAIN';status.textContent='Wait until the panel turns green.';$('reactionStart').disabled=false;}
+          return;
+        }
+        const ms=Math.round(performance.now()-arcadeReactionStarted);arcadeReactionReady=false;
+        pad.style.background='rgba(8,34,49,.8)';pad.style.color='#7bffdf';pad.textContent=ms+' ms';
+        status.textContent=ms<220?'Lightning reflexes.':ms<320?'Fast response.':'Test complete — try to beat that time.';
+        const prev=Number(localStorage.getItem('jarvis_arcade_reaction_best')||0);
+        if(!prev||ms<prev){localStorage.setItem('jarvis_arcade_reaction_best',String(ms));$('reactionBest').textContent='NEW PERSONAL BEST · '+ms+' ms';}
+      };
+      return;
+    }
+    if (name==='memory') {
+      arcadeMemorySequence=[];arcadeMemoryInput=[];arcadeMemoryLocked=false;arcadeMemoryRound=0;
+      arcadeStageView('MEMORY MATRIX','<div class="arcade-status" id="memoryStatus">Watch the pattern, then repeat it by tapping the tiles.</div><div class="arcade-small" style="text-align:center" id="memoryRound">ROUND 0</div><div class="matrix-grid" id="matrixGrid">'+Array.from({length:16},(_,i)=>'<button class="matrix-tile" type="button" data-matrix="'+i+'" aria-label="Tile '+(i+1)+'"></button>').join('')+'</div><div class="arcade-controls" style="justify-content:center"><button class="chess-btn" type="button" id="memoryStart">START TRAINING</button><button class="chess-btn" type="button" data-arcade-back>BACK TO HUB</button></div>');
+      $('memoryStart').onclick=arcadeMemoryNext;
+      $('matrixGrid').onclick=(e)=>{
+        const tile=e.target.closest('[data-matrix]');if(!tile||arcadeMemoryLocked||!arcadeMemoryRound)return;
+        const n=Number(tile.dataset.matrix);tile.classList.add('lit');setTimeout(()=>tile.classList.remove('lit'),160);
+        if(n!==arcadeMemorySequence[arcadeMemoryInput.length]){
+          arcadeMemoryLocked=true;$('memoryStatus').textContent='Sequence missed. You reached round '+arcadeMemoryRound+'.';$('memoryStart').textContent='TRY AGAIN';$('memoryStart').onclick=()=>{arcadeMemorySequence=[];arcadeMemoryInput=[];arcadeMemoryRound=0;arcadeMemoryLocked=false;$('memoryStatus').textContent='Watch the pattern, then repeat it.';arcadeMemoryNext();};return;
+        }
+        arcadeMemoryInput.push(n);
+        if(arcadeMemoryInput.length===arcadeMemorySequence.length){arcadeMemoryLocked=true;$('memoryStatus').textContent='Correct! Preparing next round…';setTimeout(arcadeMemoryNext,650);}
+      };
+      return;
+    }
+    if (name==='codebreaker') {
+      arcadeCode=Array.from({length:10},(_,i)=>String(i)).sort(()=>Math.random()-.5).slice(0,4).join('');
+      arcadeCodeAttempts=0;
+      arcadeStageView('CODEBREAKER','<div class="arcade-status" id="codeStatus">Crack the secret four-digit code. Digits do not repeat.</div><p class="arcade-small">Clues show how many digits are correct and in the correct position, followed by correct digits in the wrong position.</p><div class="arcade-controls"><input class="arcade-input" id="codeGuess" inputmode="numeric" maxlength="4" placeholder="0000" aria-label="Four digit code guess"><button class="chess-btn" id="codeSubmit" type="button">DECRYPT</button></div><div id="codeHistory" style="margin-top:12px;line-height:1.8"></div><div class="arcade-controls"><button class="chess-btn" type="button" id="codeRestart">NEW CODE</button><button class="chess-btn" type="button" data-arcade-back>BACK TO HUB</button></div>');
+      $('codeSubmit').onclick=arcadeCodeGuess;
+      $('codeGuess').onkeydown=(e)=>{if(e.key==='Enter')arcadeCodeGuess();};
+      $('codeRestart').onclick=()=>arcadeLaunch('codebreaker');
+    }
+  }
+  function arcadeMemoryNext() {
+    if(!$('matrixGrid'))return;
+    arcadeMemoryRound++;arcadeMemorySequence.push(Math.floor(Math.random()*16));arcadeMemoryInput=[];arcadeMemoryLocked=true;
+    $('memoryRound').textContent='ROUND '+arcadeMemoryRound;
+    $('memoryStatus').textContent='Memorize the sequence…';
+    const tiles=[...$('matrixGrid').querySelectorAll('.matrix-tile')];
+    let idx=0;
+    const show=()=>{if(!$('matrixGrid'))return;tiles.forEach(t=>t.classList.remove('lit'));if(idx>=arcadeMemorySequence.length){arcadeMemoryLocked=false;$('memoryStatus').textContent='Your turn — repeat the pattern.';return;}tiles[arcadeMemorySequence[idx]].classList.add('lit');setTimeout(()=>{tiles[arcadeMemorySequence[idx]].classList.remove('lit');idx++;setTimeout(show,170);},430);};
+    show();
+  }
+  function arcadeCodeGuess() {
+    const input=$('codeGuess'), status=$('codeStatus');if(!input||!status)return;
+    const guess=input.value.trim();
+    if(!/^\d{4}$/.test(guess)||new Set(guess).size!==4){status.textContent='Enter four different digits.';return;}
+    arcadeCodeAttempts++;
+    let exact=0, misplaced=0;
+    for(let i=0;i<4;i++){if(guess[i]===arcadeCode[i])exact++;else if(arcadeCode.includes(guess[i]))misplaced++;}
+    const row=document.createElement('div');row.textContent=guess+'  →  '+exact+' exact · '+misplaced+' misplaced';$('codeHistory').prepend(row);
+    input.value='';
+    if(exact===4){status.textContent='ACCESS GRANTED — cracked in '+arcadeCodeAttempts+' attempts.';$('codeSubmit').disabled=true;}
+    else if(arcadeCodeAttempts>=10){status.textContent='LOCKOUT — the code was '+arcadeCode+'. Start a new code to try again.';$('codeSubmit').disabled=true;}
+    else status.textContent='Attempt '+arcadeCodeAttempts+' of 10. Keep decoding.';
+  }
+
+  $('arcadeShortcut').addEventListener('click', arcadeOpen);
+  $('arcadeClose').addEventListener('click', arcadeClose);
+  $('arcadeHome').addEventListener('click', arcadeHome);
+  arcadeGrid.addEventListener('click',e=>{const card=e.target.closest('[data-arcade-game]');if(card)arcadeLaunch(card.dataset.arcadeGame);});
+  arcadeStage.addEventListener('click',e=>{if(e.target.closest('[data-arcade-back]'))arcadeHome();});
+  arcadeOverlay.addEventListener('click',e=>{if(e.target===arcadeOverlay)arcadeClose();});
   $('chessShortcut').addEventListener('click', chessOpen);
   $('wake').addEventListener('click', () => {
     $('wake').remove();
