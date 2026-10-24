@@ -1,4 +1,5 @@
 (() => {
+  if (chrome.runtime.id !== "khgincaplmbedfnhkpdoliapmflnpfah") return;
   const allowedApps = new Set(["calculator", "notepad", "file explorer", "paint", "spotify"]);
 
   window.addEventListener("message", (event) => {
