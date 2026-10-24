@@ -225,7 +225,6 @@
   .chess-board {position:relative;isolation:isolate;display:grid;grid-template-columns:repeat(8,minmax(0,1fr));aspect-ratio:1;border:2px solid rgba(88,231,255,.82);border-radius:3px;box-shadow:0 0 14px rgba(42,209,255,.38),0 0 42px rgba(42,209,255,.2),inset 0 0 25px rgba(42,209,255,.13);overflow:hidden;user-select:none;transform:perspective(1100px) rotateX(5deg);transform-origin:center 58%;background:#03121e}
   .chess-3d-canvas {position:absolute;inset:0;width:100%;height:100%;z-index:2;pointer-events:none;display:block}
   .chess-board.chess-3d-ready .chess-piece {visibility:hidden}
-  .chess-board.chess-3d-ready .chess-square {background:transparent!important;box-shadow:none!important}
   .chess-board.chess-3d-ready .chess-square.selected {background:rgba(20,166,210,.3)!important}
   .chess-board.chess-3d-ready .chess-square.legal::after {z-index:4}
   .chess-theme-classic .chess-board.chess-3d-ready .chess-square.selected {background:rgba(213,180,94,.28)!important}
@@ -446,7 +445,7 @@
     if(!chess3d||!chessGame)return;
     const {THREE,pieces,scene,renderer,camera}=chess3d;
     while(pieces.children.length){
-      const obj=pieces.children.pop(); pieces.remove(obj);
+      const obj=pieces.children[0]; pieces.remove(obj);
       obj.traverse(node=>{if(node.geometry)node.geometry.dispose();if(node.material){if(Array.isArray(node.material))node.material.forEach(m=>m.dispose());else node.material.dispose();}});
     }
     const tilt=camera.position.y/Math.hypot(camera.position.y,camera.position.z);
