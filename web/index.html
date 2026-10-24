@@ -280,7 +280,7 @@
       if (memories.some(x => x.toLowerCase() === item.toLowerCase())) return 'Already saved. My memory circuits are awake.';
       memories.push(item);
       if (!saveLocalList(MEMORY_KEY, memories.slice(-20))) return 'Browser storage is unavailable, so I could not save that.';
-      refreshFunHud(); return 'Saved in this browser. I can recall it here later; please do not save passwords or sensitive details.';
+      refreshFunHud(); return 'Saved in this browser. When you chat later, these notes may be sent with your message to the AI service; do not save passwords or sensitive details.';
     }
     if (/^(?:what do you remember|show my memories|list memories|what have you remembered)[?.!]*$/i.test(raw)) {
       const memories = getMemories();
