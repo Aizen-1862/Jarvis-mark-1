@@ -23,7 +23,7 @@ Never upload `.env`, API keys, or passwords to GitHub. The `.env.example` file c
 
 ## What works remotely
 
-The hosted website can be opened from computers and phones using the same Render URL and password. The local Windows native app bridge is separate: it can only launch apps on a Windows computer where the Chrome extension and native host are installed. A cloud service cannot open Calculator on your local computer by itself. The extension allows both `127.0.0.1` and the current hosted domain `jarvis-mark-1-k6sq.onrender.com`.
+The hosted website can be opened from computers and phones using the same Render URL and password. The Windows native app bridge is separate: on a Windows computer where the Chrome extension and native host are installed, the hosted website can request launching installed apps and opening existing folders under your Windows user folder. Folder requests are restricted to that home directory and block common sensitive locations. The bridge does not provide arbitrary shell access, file reads, file writes, or deletion. A cloud service cannot control your local computer unless this local bridge is installed and enabled. The extension allows both `127.0.0.1` and the current hosted domain `jarvis-mark-1-k6sq.onrender.com`.
 
 The browser voice-input API is most consistent in desktop Chrome or Edge. Typed requests remain available when voice input is unsupported. General answers stream as they are generated; requests for changing facts use OpenRouter web search when supported by the selected model.
 
