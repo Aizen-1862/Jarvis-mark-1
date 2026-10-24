@@ -195,6 +195,45 @@ def openrouter_post(cfg: dict[str, str], payload: dict) -> dict:
     return data
 
 
+def openrouter_stream(cfg: dict[str, str], messages: list[dict]):
+    """Yield text deltas from OpenRouter for a plain conversational reply."""
+    payload = {
+        "model": cfg["OPENROUTER_MODEL"],
+        "messages": [{"role": "system", "content": system_prompt(cfg)}, *messages],
+        "max_tokens": 4000,
+        "stream": True,
+    }
+    request = urllib.request.Request(OPENROUTER_URL, data=json.dumps(payload).encode("utf-8"), method="POST", headers={
+        "Authorization": f"Bearer {cfg['OPENROUTER_API_KEY']}",
+        "Content-Type": "application/json",
+    })
+    try:
+        with urllib.request.urlopen(request, timeout=90) as response:  # noqa: S310 - fixed https URL
+            for line in response:
+                line = line.decode("utf-8", "replace").strip()
+                if not line.startswith("data:"):
+                    continue
+                raw = line[5:].strip()
+                if raw == "[DONE]":
+                    return
+                try:
+                    event = json.loads(raw)
+                except json.JSONDecodeError:
+                    continue
+                problem = event.get("error")
+                if isinstance(problem, dict):
+                    code = problem.get("code")
+                    raise OpenRouterError(code if isinstance(code, int) else 502, str(problem.get("message") or problem))
+                choices = event.get("choices") or []
+                delta = (choices[0].get("delta") or {}).get("content") if choices else None
+                if isinstance(delta, str) and delta:
+                    yield delta
+    except urllib.error.HTTPError as err:
+        raise OpenRouterError(err.code, err.read()[:400].decode("utf-8", "replace")) from err
+    except (urllib.error.URLError, TimeoutError) as err:
+        raise OpenRouterError(0, str(err)) from err
+
+
 AGENT_TOOLS = [{
     "type": "function",
     "function": {
@@ -510,6 +549,44 @@ class Handler(BaseHTTPRequestHandler):
         data = self._read_json()
         text = str(data.get("text") or "").strip()[:2000]
         title = cfg["JARVIS_CALLS_YOU"]
+
+        if path == "/api/chat/stream":
+            if not text:
+                self._json(400, {"error": "Say something first."})
+                return
+            if not cfg.get("OPENROUTER_API_KEY"):
+                self._json(503, {"error": f"My brain isn't connected yet, {title}. Add OPENROUTER_API_KEY and restart JARVIS."})
+                return
+            log(f"You:    {text}")
+            with _lock:
+                messages = list(_history) + [{"role": "user", "content": text}]
+            self.send_response(200)
+            self.send_header("Content-Type", "text/event-stream; charset=utf-8")
+            self.send_header("Cache-Control", "no-cache, no-store")
+            self.send_header("X-Accel-Buffering", "no")
+            self.send_header("Connection", "close")
+            self.end_headers()
+            pieces: list[str] = []
+            try:
+                for piece in openrouter_stream(cfg, messages):
+                    pieces.append(piece)
+                    self.wfile.write(("data: " + json.dumps({"text": piece}, ensure_ascii=False) + "\n\n").encode("utf-8"))
+                    self.wfile.flush()
+                reply = "".join(pieces).strip() or f"I'm not sure what to say to that, {title}."
+                with _lock:
+                    _history.extend([{"role": "user", "content": text}, {"role": "assistant", "content": reply}])
+                    del _history[:-16]
+                log(f"JARVIS: {reply}")
+                self.wfile.write(b"data: {\"done\":true}\n\n")
+                self.wfile.flush()
+            except OpenRouterError as err:
+                log(f"OpenRouter error {err}")
+                message = brain_error(err, cfg)
+                self.wfile.write(("data: " + json.dumps({"error": message}, ensure_ascii=False) + "\n\n").encode("utf-8"))
+                self.wfile.flush()
+            except (BrokenPipeError, ConnectionResetError):
+                pass
+            return
 
         if path == "/api/chat":
             if not text:
