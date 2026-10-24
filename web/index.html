@@ -33,7 +33,14 @@
   .reaction-pop { position:fixed; z-index:6; pointer-events:none; left:50%; top:42%; color:#ff8bda; font-size:22px; text-shadow:0 0 16px rgba(255,139,218,.8); animation:reactionFloat 1.35s ease-out forwards; }
   @keyframes egirlPulse { 50% { opacity:.72; filter:brightness(1.5); } }
   @keyframes sparkle { 50% { opacity:.45; transform:scale(1.2) rotate(12deg); } }
+
   @keyframes reactionFloat { from { opacity:0; transform:translate(-50%,8px) scale(.7) rotate(-8deg); } 20% { opacity:1; } to { opacity:0; transform:translate(calc(-50% + 22px),-85px) scale(1.3) rotate(14deg); } }
+  body.egg-arcade { --cyan:#7bffb2; --accent:#7bffb2; --glow:rgba(123,255,178,.42); }
+  body.egg-power { --cyan:#ff6464; --accent:#ff6464; --glow:rgba(255,55,75,.55); }
+  body.egg-party::after { content:"✦  ✧  ★  ✧  ✦"; position:fixed; inset:0; z-index:3; pointer-events:none; display:grid; place-items:center; color:#ff8bda; font:700 clamp(28px,7vw,72px) "Orbitron",sans-serif; letter-spacing:.12em; text-shadow:0 0 28px currentColor; animation:eggFlash 1.8s ease-out forwards; }
+  body.egg-power::after { content:"POWER SURGE"; position:fixed; inset:0; z-index:3; pointer-events:none; display:grid; place-items:center; color:#ff6464; font:700 clamp(22px,5vw,54px) "Orbitron",sans-serif; letter-spacing:.18em; text-shadow:0 0 26px currentColor; animation:eggFlash 1.8s ease-out forwards; }
+  body.egg-arcade::after { content:"SECRET LEVEL UNLOCKED"; position:fixed; inset:0; z-index:3; pointer-events:none; display:grid; place-items:center; color:#7bffb2; font:700 clamp(18px,4vw,42px) "Orbitron",sans-serif; letter-spacing:.12em; text-shadow:0 0 26px currentColor; animation:eggFlash 1.8s ease-out forwards; }
+  @keyframes eggFlash { 0% { opacity:0; transform:scale(.8); } 18% { opacity:1; transform:scale(1); } 72% { opacity:1; } 100% { opacity:0; transform:scale(1.08); } }
   @media (max-width:700px) { .fun-hud { right:8px; bottom:8px; font-size:9px; } }
   @media (prefers-reduced-motion:reduce) { .reaction-pop, .fun-hud .spark { animation:none !important; } }
   * { box-sizing: border-box; }
@@ -272,6 +279,29 @@
     pop.style.left = (42 + Math.random() * 16) + '%'; document.body.append(pop);
     setTimeout(() => pop.remove(), 1450);
   }
+  function triggerEasterEgg(text) {
+    if (!document.body.classList.contains('mode-egirl')) return null;
+    const key = text.trim().toLowerCase().replace(/[.!?]+$/g, '');
+    const eggs = {
+      'surprise me': { reply: 'Secret protocol unlocked. Sparkles deployed. Dignity temporarily offline.', effect: 'egg-party', symbol: '✦' },
+      'open the pod bay doors': { reply: 'I am afraid I cannot do that. Kidding. The doors are open. Please do not ask me to sing.', effect: 'egg-arcade', symbol: '⌁' },
+      'its over 9000': { reply: 'POWER LEVEL: OVER NINE THOUSAND. Please remain calm while the dramatic soundtrack loads.', effect: 'egg-power', symbol: '⚡' },
+      "it's over 9000": { reply: 'POWER LEVEL: OVER NINE THOUSAND. Please remain calm while the dramatic soundtrack loads.', effect: 'egg-power', symbol: '⚡' },
+      'konami mode': { reply: 'Hidden level found. Arcade HUD online. No extra lives included.', effect: 'egg-arcade', symbol: '★' },
+      'who is the best assistant': { reply: 'I could name a certain highly sophisticated AI, but I shall remain professionally mysterious.', effect: 'egg-party', symbol: '✧' },
+      'siiiiu': { reply: 'SIUUU protocol detected. Crowd simulation: imaginary. Confidence: maximum.', effect: 'egg-party', symbol: '⚽' },
+      'sudo make me smile': { reply: 'Request accepted. Compiling one smile, three sparkles, and a suspicious amount of confidence.', effect: 'egg-party', symbol: '♡' }
+    };
+    const egg = eggs[key];
+    if (!egg) return null;
+    document.body.classList.remove('egg-party', 'egg-power', 'egg-arcade');
+    document.body.classList.add(egg.effect);
+    popReaction(egg.symbol);
+    for (let i = 0; i < 7; i++) setTimeout(() => popReaction(egg.symbol), i * 95);
+    setTimeout(() => document.body.classList.remove(egg.effect), 1900);
+    return egg.reply;
+  }
+
   function localGirlfriendCommand(text) {
     if (!document.body.classList.contains('mode-egirl')) return null;
     const raw = text.trim(); let m;
@@ -778,6 +808,11 @@
     showExchange(text, '');
     setState('thinking');
     const replyEl = addLine('jarvis', 'JARVIS', '...');
+    const eggReply = triggerEasterEgg(text);
+    if (eggReply !== null) {
+      replyEl.textContent = eggReply; busy = false;
+      void speak(eggReply); setState('idle'); return;
+    }
     const localReply = localGirlfriendCommand(text);
     if (localReply !== null) {
       replyEl.textContent = localReply; busy = false;
