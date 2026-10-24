@@ -223,6 +223,12 @@
   .chess-layout {display:grid;grid-template-columns:minmax(0,1.15fr) minmax(220px,.85fr);gap:18px;align-items:start}
   /* The default board is a volumetric cyan hologram, not a flat icon grid. */
   .chess-board {position:relative;isolation:isolate;display:grid;grid-template-columns:repeat(8,minmax(0,1fr));aspect-ratio:1;border:2px solid rgba(88,231,255,.82);border-radius:3px;box-shadow:0 0 14px rgba(42,209,255,.38),0 0 42px rgba(42,209,255,.2),inset 0 0 25px rgba(42,209,255,.13);overflow:hidden;user-select:none;transform:perspective(1100px) rotateX(5deg);transform-origin:center 58%;background:#03121e}
+  .chess-3d-canvas {position:absolute;inset:0;width:100%;height:100%;z-index:2;pointer-events:none;display:block}
+  .chess-board.chess-3d-ready .chess-piece {visibility:hidden}
+  .chess-board.chess-3d-ready .chess-square {background:transparent!important;box-shadow:none!important}
+  .chess-board.chess-3d-ready .chess-square.selected {background:rgba(20,166,210,.3)!important}
+  .chess-board.chess-3d-ready .chess-square.legal::after {z-index:4}
+  .chess-theme-classic .chess-board.chess-3d-ready .chess-square.selected {background:rgba(213,180,94,.28)!important}
   .chess-board::before {content:"";position:absolute;inset:0;z-index:3;pointer-events:none;background:repeating-linear-gradient(0deg,transparent 0 5px,rgba(106,239,255,.045) 6px 7px),linear-gradient(115deg,rgba(255,255,255,.08),transparent 26%,transparent 70%,rgba(44,222,255,.09));mix-blend-mode:screen}
   .chess-board::after {content:"";position:absolute;inset:0;z-index:4;pointer-events:none;border:1px solid rgba(139,246,255,.35);box-shadow:inset 0 0 18px rgba(68,224,255,.2)}
   .chess-square {position:relative;display:flex;align-items:center;justify-content:center;aspect-ratio:1;padding:0;border:1px solid rgba(104,229,255,.09);border-radius:0;min-width:0;cursor:pointer;font-size:clamp(25px,4.5vw,51px);line-height:1;transition:filter .15s,background .15s;overflow:hidden}
@@ -324,6 +330,7 @@
 
   <audio id="voice"></audio>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
 <script>
   const $ = (id) => document.getElementById(id);
@@ -333,9 +340,134 @@
   const chessBoardEl = $('chessBoard');
   const chessGlyphs = { w:{k:'♔',q:'♕',r:'♖',b:'♗',n:'♘',p:'♙'}, b:{k:'♚',q:'♛',r:'♜',b:'♝',n:'♞',p:'♟︎'} };
   let chessGame = null, chessSelected = null, chessTargets = [], chessFlipped = false, chessPendingPromotion = null, chessThinking = false, chessLastMove = null;
+
+  // Three.js renders custom 3D chessmen over the clickable board. If WebGL/CDN is
+  // unavailable, the accessible Unicode pieces remain as a safe fallback.
+  let chess3d = null;
+  function initChess3D() {
+    if (chess3d || !window.THREE) return !!chess3d;
+    try {
+      const THREE = window.THREE;
+      const renderer = new THREE.WebGLRenderer({alpha:true,antialias:true,powerPreference:'low-power'});
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,2));
+      renderer.setClearColor(0x000000,0);
+      renderer.outputEncoding = THREE.sRGBEncoding;
+      renderer.shadowMap.enabled = true;
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+      renderer.domElement.className = 'chess-3d-canvas';
+      renderer.domElement.setAttribute('aria-hidden','true');
+      const scene = new THREE.Scene();
+      const camera = new THREE.OrthographicCamera(-4,4,4,-4,.1,100);
+      camera.position.set(0,12,2.5);
+      camera.lookAt(0,0,0);
+      const ambient = new THREE.HemisphereLight(0xb9f5ff,0x07121d,2.1);
+      scene.add(ambient);
+      const key = new THREE.DirectionalLight(0xffffff,2.2);
+      key.position.set(-4,9,5); key.castShadow=true; scene.add(key);
+      const rim = new THREE.PointLight(0x26dfff,2.4,18); rim.position.set(0,4,-3); scene.add(rim);
+      const pieces = new THREE.Group(); scene.add(pieces);
+      chess3d = {THREE,renderer,scene,camera,pieces,board:chessBoardEl};
+      chessBoardEl.appendChild(renderer.domElement);
+      resizeChess3D();
+      window.addEventListener('resize',resizeChess3D,{passive:true});
+      return true;
+    } catch (error) {
+      console.warn('3D chess renderer unavailable; using classic symbols.',error);
+      chess3d = null;
+      return false;
+    }
+  }
+  function resizeChess3D() {
+    if (!chess3d) return;
+    const rect=chessBoardEl.getBoundingClientRect();
+    if(!rect.width||!rect.height)return;
+    const tilt=chess3d.camera.position.y/Math.hypot(chess3d.camera.position.y,chess3d.camera.position.z);
+    const halfH=4/tilt, aspect=rect.width/rect.height;
+    chess3d.camera.left=-halfH*aspect; chess3d.camera.right=halfH*aspect;
+    chess3d.camera.top=halfH; chess3d.camera.bottom=-halfH;
+    chess3d.camera.updateProjectionMatrix();
+    chess3d.renderer.setSize(rect.width,rect.height,false);
+    drawChess3D();
+  }
+  function makeChessPiece(type,color) {
+    const {THREE}=chess3d;
+    const classic=chessOverlay.classList.contains('chess-theme-classic');
+    const white=color==='w';
+    const material=new THREE.MeshStandardMaterial({
+      color:classic?(white?0xf8e7c7:0x35271b):(white?0xe8fdff:0x36cfff),
+      metalness:classic?(white?.25:.12):.68,
+      roughness:classic?.32:.22,
+      emissive:classic?(white?0x28180a:0x100904):(white?0x47dfff:0x008dca),
+      emissiveIntensity:classic?.05:(white?.72:1.05)
+    });
+    const accent=new THREE.MeshStandardMaterial({
+      color:classic?(white?0xffe8bd:0x9c744a):(white?0xffffff:0x70f4ff),
+      metalness:.75,roughness:.2,emissive:classic?0x120900:0x18cfff,
+      emissiveIntensity:classic?.02:.65
+    });
+    const group=new THREE.Group();
+    const mesh=(geometry,mat=material,x=0,y=0,z=0,rx=0,ry=0,rz=0)=>{
+      const m=new THREE.Mesh(geometry,mat);m.position.set(x,y,z);m.rotation.set(rx,ry,rz);m.castShadow=true;m.receiveShadow=true;group.add(m);return m;
+    };
+    const cyl=(r1,r2,h,y,mat=material,segments=24)=>mesh(new THREE.CylinderGeometry(r1,r2,h,segments),mat,0,y,0);
+    const ball=(r,y,mat=material)=>mesh(new THREE.SphereGeometry(r,20,14),mat,0,y,0);
+    const cone=(r,h,y,mat=material,segments=24)=>mesh(new THREE.ConeGeometry(r,h,segments),mat,0,y,0);
+    const torus=(r,t,y,mat=accent)=>mesh(new THREE.TorusGeometry(r,t,8,24),mat,0,y,0,Math.PI/2,0,0);
+    // A layered turned base makes the silhouettes read like carved chess pieces.
+    cyl(.31,.28,.10, .07,accent); cyl(.25,.19,.10,.16); cyl(.17,.13,.12,.26);
+    if(type==='p'){
+      cyl(.105,.13,.25,.43); torus(.14,.025,.32); ball(.135,.62,accent);
+    } else if(type==='r'){
+      cyl(.19,.16,.34,.45); cyl(.25,.20,.09,.64,accent);
+      for(let i=0;i<8;i++){const a=i*Math.PI/4;mesh(new THREE.BoxGeometry(.095,.12,.095),accent,Math.cos(a)*.19,.735,Math.sin(a)*.19);}
+    } else if(type==='n'){
+      cyl(.17,.13,.2,.37); 
+      mesh(new THREE.SphereGeometry(.17,18,14),material,.01,.53,-.01,0,0,-.25);
+      mesh(new THREE.ConeGeometry(.135,.38,18),material,.02,.70,-.08,0,0,-.48);
+      ball(.055,.78,accent);
+      mesh(new THREE.ConeGeometry(.07,.19,12),accent,.01,.91,-.18,0,0,-.2);
+      ball(.025,.80,accent).position.x=.09;
+    } else if(type==='b'){
+      cyl(.16,.13,.18,.37); cone(.19,.38,.62); ball(.105,.84,accent); cone(.045,.17,1.00,accent);
+      mesh(new THREE.TorusGeometry(.12,.018,8,20),accent,0,.67,0,Math.PI/2,0,.55);
+    } else if(type==='q'){
+      cyl(.17,.13,.20,.37); cone(.22,.34,.62); cyl(.22,.25,.07,.79,accent);
+      for(let i=0;i<7;i++){const a=i*Math.PI*2/7;ball(.055,.90,accent).position.set(Math.cos(a)*.18,.90,Math.sin(a)*.18);}
+      ball(.09,.91,accent);
+    } else if(type==='k'){
+      cyl(.18,.13,.22,.38); cone(.22,.38,.66); cyl(.22,.25,.07,.86,accent);
+      cyl(.045,.045,.28,1.04,accent,12);
+      mesh(new THREE.BoxGeometry(.24,.055,.055),accent,0,1.08,0);
+      ball(.055,1.19,accent);
+    }
+    return group;
+  }
+  function drawChess3D() {
+    if(!chess3d||!chessGame)return;
+    const {THREE,pieces,scene,renderer,camera}=chess3d;
+    while(pieces.children.length){
+      const obj=pieces.children.pop(); pieces.remove(obj);
+      obj.traverse(node=>{if(node.geometry)node.geometry.dispose();if(node.material){if(Array.isArray(node.material))node.material.forEach(m=>m.dispose());else node.material.dispose();}});
+    }
+    const tilt=camera.position.y/Math.hypot(camera.position.y,camera.position.z);
+    const board=chessGame.board();
+    for(let row=0;row<8;row++)for(let col=0;col<8;col++){
+      const p=board[row][col]; if(!p)continue;
+      const file=chessFlipped?7-col:col;
+      const rank=chessFlipped?row:7-row;
+      const model=makeChessPiece(p.type,p.color);
+      model.position.set(file-3.5,0,(rank-3.5)/tilt);
+      const scale=chessBoardEl.clientWidth/Math.max(1,chessBoardEl.clientHeight);
+      model.scale.setScalar(.91);
+      pieces.add(model);
+    }
+    renderer.render(scene,camera);
+  }
+
   function chessOpen() {
     chessOverlay.classList.add('open'); chessOverlay.setAttribute('aria-hidden','false');
     if (!window.Chess) { $('chessStatus').textContent = 'Chess rules library did not load. Check your internet connection and reload JARVIS.'; return; }
+    initChess3D();
     if (!chessGame) chessNewGame();
     renderChess();
   }
@@ -360,6 +492,8 @@
   function renderChess() {
     if (!chessGame) return;
     chessBoardEl.innerHTML='';
+    if(chess3d){chessBoardEl.classList.add('chess-3d-ready');chessBoardEl.appendChild(chess3d.renderer.domElement);resizeChess3D();}
+    else chessBoardEl.classList.remove('chess-3d-ready');
     const files=chessFlipped?'hgfedcba':'abcdefgh';
     const ranks=chessFlipped?'12345678':'87654321';
     const legal=chessGame.moves({verbose:true});
@@ -383,6 +517,7 @@
     $('chessDifficulty').disabled=$('chessMode').value!=='ai';
     $('chessUndo').disabled=!hist.length||chessThinking;
     $('chessNew').disabled=chessThinking;
+    drawChess3D();
   }
   function chessClick(square) {
     if(!chessGame||chessThinking||chessGame.game_over()||chessPendingPromotion)return;
@@ -462,6 +597,7 @@
   function chessToggleTheme() {
     const classic=chessOverlay.classList.toggle('chess-theme-classic');
     $('chessTheme').textContent=classic?'Switch to holographic':'Switch to classic';
+    if(chess3d) drawChess3D();
   }
   $('chessClose').addEventListener('click',chessClose);
   $('chessTheme').addEventListener('click',chessToggleTheme);
