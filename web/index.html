@@ -231,6 +231,7 @@
   const typeBox = $('typeBox');
   const LABELS = { idle: 'Standing by', listening: 'Listening', thinking: 'Thinking', speaking: 'Speaking' };
   let calls = 'sir';
+  let protocols = [];
   let busy = false;
 
   function setState(state) {
@@ -275,6 +276,7 @@
     try {
       const s = await (await fetch('/api/status')).json();
       calls = s.calls || 'sir';
+      protocols = Array.isArray(s.protocols) ? s.protocols : [];
       $('dotVoice').className = 'dot ' + (s.voice ? 'on' : 'off');
       $('dotBrain').className = 'dot ' + (s.brain ? 'on' : 'off');
       if (!s.brain) toast('No brain key yet. Add your OpenRouter key to the .env file and restart JARVIS.');
@@ -316,8 +318,11 @@
   }
 
   let speakToken = 0;
+  let speakAbort = null;
   function stopSpeaking() {
     speakToken += 1;
+    if (speakAbort) speakAbort.abort();
+    speakAbort = null;
     voice.pause();
     if ('speechSynthesis' in window) speechSynthesis.cancel();
   }
@@ -360,15 +365,127 @@
     if (token === speakToken) setState('idle');
   }
 
+  function isActionRequest(text) {
+    const command = /^(?:please\s+)?(?:(?:can|could)\s+you\s+)?(?:please\s+)?(?:open|launch|start|run|play|search|google|look\s+up|check|read|summari[sz]e|review|show|fetch|retrieve|turn\s+on|turn\s+off|set|stop|pause|resume|skip)\b/i;
+    const normalized = text.toLowerCase().replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
+    return command.test(text) || protocols.some((phrase) => normalized.includes(String(phrase).toLowerCase()));
+  }
+
+  async function streamReply(text, replyEl) {
+    const token = ++speakToken;
+    speakAbort = new AbortController();
+    let speechQueue = Promise.resolve();
+    let speechGenerationQueue = Promise.resolve();
+    let pendingSpeech = '';
+    const queueSpeech = (chunk) => {
+      const audioPromise = speechGenerationQueue.then(async () => {
+        const response = await fetch('/api/tts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: chunk }),
+          signal: speakAbort.signal,
+        });
+        if (!response.ok) {
+          let message = 'Fish Audio voice is unavailable.';
+          try { message = (await response.json()).error || message; } catch {}
+          throw new Error(message);
+        }
+        return response.blob();
+      });
+      speechGenerationQueue = audioPromise.then(() => {}, () => {});
+      speechQueue = speechQueue.then(async () => {
+        if (token !== speakToken) return;
+        try {
+          const blob = await audioPromise;
+          if (token !== speakToken) return;
+          if (audioCtx && audioCtx.state === 'suspended') await audioCtx.resume();
+          const src = URL.createObjectURL(blob);
+          voice.src = src;
+          setState('speaking');
+          try {
+            await new Promise((resolve, reject) => {
+              voice.onended = resolve;
+              voice.onerror = resolve;
+              voice.onpause = () => { if (token !== speakToken) resolve(); };
+              voice.play().catch(reject);
+            });
+          } finally {
+            URL.revokeObjectURL(src);
+          }
+        } catch (err) {
+          if (token !== speakToken) return;
+          toast(err.message || 'Fish Audio voice is unavailable. Using the backup voice.');
+          await backupVoice(chunk);
+        }
+      });
+    };
+    const acceptText = (piece) => {
+      replyEl.textContent += piece;
+      pendingSpeech += piece;
+      let match;
+      const sentence = /[.!?](?:["')\]]*)\s+/;
+      while ((match = sentence.exec(pendingSpeech))) {
+        const chunk = pendingSpeech.slice(0, match.index + match[0].length).trim();
+        pendingSpeech = pendingSpeech.slice(match.index + match[0].length);
+        if (chunk) queueSpeech(chunk);
+      }
+      if (pendingSpeech.length >= 160) {
+        const cut = pendingSpeech.lastIndexOf(' ', 150);
+        if (cut > 60) {
+          queueSpeech(pendingSpeech.slice(0, cut).trim());
+          pendingSpeech = pendingSpeech.slice(cut + 1);
+        }
+      }
+    };
+
+    const response = await fetch('/api/chat/stream', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text }),
+    });
+    if (!response.ok || !response.body) {
+      let message = 'JARVIS could not start a streamed reply.';
+      try { message = (await response.json()).error || message; } catch {}
+      throw new Error(message);
+    }
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let streamError = '';
+    let done = false;
+    while (!done) {
+      const part = await reader.read();
+      done = part.done;
+      buffer += decoder.decode(part.value || new Uint8Array(), { stream: !done });
+      let boundary;
+      while ((boundary = buffer.indexOf('\n\n')) !== -1) {
+        const event = buffer.slice(0, boundary);
+        buffer = buffer.slice(boundary + 2);
+        for (const line of event.split('\n')) {
+          if (!line.startsWith('data:')) continue;
+          try {
+            const data = JSON.parse(line.slice(5).trim());
+            if (data.text) acceptText(data.text);
+            if (data.error) streamError = data.error;
+          } catch {}
+        }
+      }
+    }
+    if (pendingSpeech.trim()) queueSpeech(pendingSpeech.trim());
+    if (streamError && !replyEl.textContent) replyEl.textContent = streamError;
+    if (!replyEl.textContent) replyEl.textContent = streamError || 'I did not receive a reply.';
+    busy = false;
+    if (streamError) toast(streamError);
+    await speechQueue;
+    if (token === speakToken) setState('idle');
+  }
+
   // ---- talking to the brain
   function launchNativeApp(app) {
     return new Promise((resolve) => {
       const requestId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-      let responseTimer;
-      const failures = [];
       const finish = (result) => {
         window.removeEventListener('message', onMessage);
-        clearTimeout(responseTimer);
         clearTimeout(timeout);
         resolve(result);
       };
@@ -376,15 +493,7 @@
         if (event.source !== window || event.origin !== location.origin) return;
         const message = event.data;
         if (message?.source !== 'JARVIS_BRIDGE' || message.requestId !== requestId) return;
-        const result = message.result || { ok: false, error: 'No launch confirmation received.' };
-        if (result.ok) {
-          finish(result);
-          return;
-        }
-        failures.push(result);
-        // An older installed extension can reject the native host before the
-        // current extension returns success. Give the other bridge a moment.
-        if (!responseTimer) responseTimer = setTimeout(() => finish(failures[0]), 900);
+        finish(message.result || { ok: false, error: 'No launch confirmation received.' });
       };
       // Windows may take several seconds to wake or launch a packaged app; don't
       // report a missing bridge while the native host is still completing launch.
@@ -403,6 +512,11 @@
     setState('thinking');
     const replyEl = addLine('jarvis', 'JARVIS', '...');
     try {
+      if (!isActionRequest(text)) {
+        replyEl.textContent = '';
+        await streamReply(text, replyEl);
+        return;
+      }
       const r = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -413,7 +527,7 @@
       for (const app of data.launch_apps || []) {
         const result = await launchNativeApp(app);
         const appName = app.replace(/\b\w/g, (letter) => letter.toUpperCase());
-        reply = result.ok ? `Opening ${appName} now, sir.` : result.error ? `I couldn't open ${appName}, sir. Windows bridge error: ${result.error}` : `I sent the request to open ${appName}, sir, but didn't receive confirmation. Refresh JARVIS and check the Windows app bridge.`;
+        reply = result.ok ? `Opening ${appName} now, sir.` : `I can't open ${appName} yet, sir. Enable the JARVIS Windows app bridge.`;
       }
       replyEl.textContent = reply;
       for (const url of data.open || []) {
@@ -433,9 +547,13 @@
       }
       if (data.error) toast(reply);
       busy = false;
-      await speak(reply);
+      // Don't hold up the response flow while Fish Audio generates and plays
+      // the voice. The answer is already visible; speech can run in the
+      // background and still be cancelled by the next interaction.
+      void speak(reply);
     } catch {
-      replyEl.textContent = 'I lost contact with my server. Is the JARVIS window still open?';
+      replyEl.textContent = 'I lost contact with my server or voice service. Is the JARVIS window still open?';
+      toast(replyEl.textContent);
       busy = false;
       setState('idle');
     }
