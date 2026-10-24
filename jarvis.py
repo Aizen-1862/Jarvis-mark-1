@@ -918,7 +918,7 @@ class Handler(BaseHTTPRequestHandler):
                 if protocol.get("voice"):
                     voice_id = str(protocol["voice"]).strip()
                     _voice_override = None if voice_id == "default" else voice_id
-                if _words(protocol.get("say", "")) == "activate e girl mode":
+                if _words(protocol.get("say", "")) == "activate girlfriend mode":
                     _persona_mode = "egirl"
                 elif _words(protocol.get("say", "")) == "activate jarvis mode":
                     _persona_mode = "jarvis"
