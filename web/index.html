@@ -375,7 +375,9 @@
         if (message?.source !== 'JARVIS_BRIDGE' || message.requestId !== requestId) return;
         finish(message.result || { ok: false, error: 'No launch confirmation received.' });
       };
-      const timeout = setTimeout(() => finish({ ok: false, error: 'JARVIS Windows app bridge is not enabled.' }), 3500);
+      // Windows may take several seconds to wake or launch a packaged app; don't
+      // report a missing bridge while the native host is still completing launch.
+      const timeout = setTimeout(() => finish({ ok: false, error: 'JARVIS Windows app bridge did not respond in time.' }), 15000);
       window.addEventListener('message', onMessage);
       window.postMessage({ source: 'JARVIS_PAGE', type: 'LAUNCH_APP', requestId, app }, location.origin);
     });
