@@ -222,7 +222,7 @@
   .chess-btn:hover,.chess-select:hover {border-color:var(--cyan);box-shadow:0 0 12px var(--glow)}
   .chess-layout {display:grid;grid-template-columns:minmax(0,1.15fr) minmax(220px,.85fr);gap:18px;align-items:start}
   /* The default board is a volumetric cyan hologram, not a flat icon grid. */
-  .chess-board {position:relative;isolation:isolate;display:grid;grid-template-columns:repeat(8,minmax(0,1fr));aspect-ratio:1;border:2px solid rgba(88,231,255,.82);border-radius:3px;box-shadow:0 0 14px rgba(42,209,255,.38),0 0 42px rgba(42,209,255,.2),inset 0 0 25px rgba(42,209,255,.13);overflow:hidden;user-select:none;transform:perspective(1100px) rotateX(5deg);transform-origin:center 58%;background:#03121e}
+  .chess-board {position:relative;isolation:isolate;display:grid;grid-template-columns:repeat(8,minmax(0,1fr));aspect-ratio:1;border:2px solid rgba(88,231,255,.82);border-radius:3px;box-shadow:0 0 14px rgba(42,209,255,.38),0 0 42px rgba(42,209,255,.2),inset 0 0 25px rgba(42,209,255,.13);overflow:hidden;user-select:none;transform:perspective(1100px) rotateX(0deg);transform-origin:center 58%;background:#03121e}
   .chess-3d-canvas {position:absolute;inset:0;width:100%;height:100%;z-index:2;pointer-events:none;display:block}
   .chess-board.chess-3d-ready .chess-piece {visibility:hidden}
   .chess-board.chess-3d-ready .chess-square.selected {background:rgba(20,166,210,.3)!important}
@@ -356,8 +356,9 @@
       renderer.domElement.className = 'chess-3d-canvas';
       renderer.domElement.setAttribute('aria-hidden','true');
       const scene = new THREE.Scene();
-      const camera = new THREE.OrthographicCamera(-4,4,4,-4,.1,100);
-      camera.position.set(0,12,2.5);
+      // Lower the camera substantially so the piece silhouettes, crowns and knight profiles read clearly.
+      const camera = new THREE.OrthographicCamera(-5.2,5.2,5.2,-5.2,.1,100);
+      camera.position.set(0,10.5,8.8);
       camera.lookAt(0,0,0);
       const ambient = new THREE.HemisphereLight(0xb9f5ff,0x07121d,2.1);
       scene.add(ambient);
@@ -381,7 +382,8 @@
     const rect=chessBoardEl.getBoundingClientRect();
     if(!rect.width||!rect.height)return;
     const tilt=chess3d.camera.position.y/Math.hypot(chess3d.camera.position.y,chess3d.camera.position.z);
-    const halfH=4/tilt, aspect=rect.width/rect.height;
+    // Fit the complete board into view without flattening the perspective.
+    const halfH=5.2, aspect=rect.width/rect.height;
     chess3d.camera.left=-halfH*aspect; chess3d.camera.right=halfH*aspect;
     chess3d.camera.top=halfH; chess3d.camera.bottom=-halfH;
     chess3d.camera.updateProjectionMatrix();
@@ -456,8 +458,8 @@
       const rank=chessFlipped?row:7-row;
       const model=makeChessPiece(p.type,p.color);
       model.position.set(file-3.5,0,(rank-3.5)/tilt);
-      const scale=chessBoardEl.clientWidth/Math.max(1,chessBoardEl.clientHeight);
-      model.scale.setScalar(.91);
+      // Tall, distinct silhouettes remain visible from the lower viewing angle.
+      model.scale.setScalar(.94);
       pieces.add(model);
     }
     renderer.render(scene,camera);
