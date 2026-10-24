@@ -29,6 +29,7 @@ The browser voice-input API is most consistent in desktop Chrome or Edge. Typed 
 
 ## Additional features and limits
 
+- **Windows computer operator (local only):** in the local Windows app, JARVIS can list folders, read supported text/source files, open folders in File Explorer, and create new folders or text/source files under your Windows user home. It will not overwrite or delete files, run shell commands, or read credential locations. File contents you ask it to read are sent to the configured OpenRouter model for analysis. These tools are disabled when JARVIS is hosted remotely; the hosted server cannot access your PC's files.
 - **Work Mode:** after Google OAuth is configured and you grant read-only permission, JARVIS summarizes up to 200 unread inbox messages. Mail content is sent to OpenRouter for summarization. It does not send, archive, delete, or modify messages.
 - **Image generation:** ask JARVIS to generate an image. The configured OpenRouter image model may charge per image; JARVIS shows the reported cost.
 - **Mobile app links:** Android has deep links for a small set of common apps; iOS support depends on app URL schemes. A web page cannot enumerate or launch every installed phone app. Computer apps still launch only through the Windows bridge on that computer.
