@@ -796,6 +796,36 @@ class Handler(BaseHTTPRequestHandler):
             if not text:
                 self._json(400, {"error": "Say something first."})
                 return
+
+            # Handle protocol commands before calling the AI model. Otherwise the
+            # model may answer the activation phrase with a refusal instead of the
+            # exact reply configured in protocols.json.
+            protocol = match_protocol(text)
+            if protocol:
+                if protocol.get("voice"):
+                    voice_id = str(protocol["voice"]).strip()
+                    _voice_override = None if voice_id == "default" else voice_id
+                if _words(protocol.get("say", "")) == "activate girlfriend mode":
+                    _persona_mode = "egirl"
+                elif _words(protocol.get("say", "")) == "activate jarvis mode":
+                    _persona_mode = "jarvis"
+                reply = str(protocol.get("reply") or "Right away, {you}.").replace("{you}", title)
+                log(f"You:    {text}")
+                log(f"JARVIS: {reply}  (protocol)")
+                with _lock:
+                    _history.extend([{"role": "user", "content": text}, {"role": "assistant", "content": reply}])
+                    del _history[:-16]
+                self.send_response(200)
+                self.send_header("Content-Type", "text/event-stream; charset=utf-8")
+                self.send_header("Cache-Control", "no-cache, no-store")
+                self.send_header("X-Accel-Buffering", "no")
+                self.send_header("Connection", "close")
+                self.end_headers()
+                self.wfile.write(("data: " + json.dumps({"text": reply}, ensure_ascii=False) + "\\n\\n").encode("utf-8"))
+                self.wfile.write(b'data: {"done":true}\\n\\n')
+                self.wfile.flush()
+                return
+
             if not cfg.get("OPENROUTER_API_KEY"):
                 self._json(503, {"error": f"My brain isn't connected yet, {title}. Add OPENROUTER_API_KEY and restart JARVIS."})
                 return
