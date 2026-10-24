@@ -1,10 +1,10 @@
 {
   "manifest_version": 3,
   "name": "JARVIS Spotify Search Player",
-  "version": "1.0.0",
+  "version": "1.2.0",
   "description": "Starts the first Spotify search result and launches a small allowlist of Windows apps for JARVIS.",
   "permissions": ["nativeMessaging"],
-  "host_permissions": ["http://127.0.0.1/*"],
+  "host_permissions": ["http://127.0.0.1/*", "https://jarvis-mark-1-k6sq.onrender.com/*"],
   "background": {"service_worker": "background.js"},
   "content_scripts": [
     {
@@ -13,7 +13,7 @@
       "run_at": "document_idle"
     },
     {
-      "matches": ["http://127.0.0.1/*"],
+      "matches": ["http://127.0.0.1/*", "https://jarvis-mark-1-k6sq.onrender.com/*"],
       "js": ["bridge.js"],
       "run_at": "document_idle"
     }
