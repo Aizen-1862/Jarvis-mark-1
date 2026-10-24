@@ -402,7 +402,7 @@
       for (const app of data.launch_apps || []) {
         const result = await launchNativeApp(app);
         const appName = app.replace(/\b\w/g, (letter) => letter.toUpperCase());
-        reply = result.ok ? `Opening ${appName} now, sir.` : `I can't open ${appName} yet, sir. Enable the JARVIS Windows app bridge.`;
+        reply = result.ok ? `Opening ${appName} now, sir.` : result.error ? `I couldn't open ${appName}, sir. Windows bridge error: ${result.error}` : `I sent the request to open ${appName}, sir, but didn't receive confirmation. Refresh JARVIS and check the Windows app bridge.`;
       }
       replyEl.textContent = reply;
       for (const url of data.open || []) {
