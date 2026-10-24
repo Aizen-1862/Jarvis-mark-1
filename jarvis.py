@@ -1083,6 +1083,11 @@ class Handler(BaseHTTPRequestHandler):
                 reply = f"Opening a web search for {query}, {title}."
                 self._json(200, {"reply": reply, "open": [url]})
                 return
+            folder_prefix_request = re.fullmatch(
+                r"(?:please\s+)?(?:open|show|go to|navigate to)\s+(?:my\s+)?(?:the\s+)?(?:folder|directory)\s+(.+?)[.!?]*",
+                text,
+                re.IGNORECASE,
+            )
             folder_request = re.fullmatch(
                 r"(?:please\s+)?(?:(?:can|could)\s+you\s+)?(?:please\s+)?"
                 r"(?:open|show|go to|navigate to)\s+(?:my\s+)?(?:the\s+)?"
@@ -1097,7 +1102,8 @@ class Handler(BaseHTTPRequestHandler):
                 text,
                 re.IGNORECASE,
             )
-            folder_name = (folder_request.group(1).strip() if folder_request else
+            folder_name = (folder_prefix_request.group(1).strip() if folder_prefix_request else
+                           folder_request.group(1).strip() if folder_request else
                            common_folder.group(1).strip() if common_folder else "")
             if folder_name:
                 result = run_agent_tool("open_folder", json.dumps({"path": folder_name}))
