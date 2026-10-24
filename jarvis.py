@@ -821,8 +821,8 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_header("X-Accel-Buffering", "no")
                 self.send_header("Connection", "close")
                 self.end_headers()
-                self.wfile.write(("data: " + json.dumps({"text": reply}, ensure_ascii=False) + "\\n\\n").encode("utf-8"))
-                self.wfile.write(b'data: {"done":true}\\n\\n')
+                self.wfile.write(("data: " + json.dumps({"text": reply}, ensure_ascii=False) + "\n\n").encode("utf-8"))
+                self.wfile.write(b'data: {"done":true}\n\n')
                 self.wfile.flush()
                 return
 
