@@ -34,7 +34,7 @@ OPENROUTER_KEYS_URL = "https://openrouter.ai/keys"
 DEFAULTS = {
     "FISH_VOICE_ID": "41f0953d7a6b4c078445c7e65d620eeb",  # "JARVIS" in the Fish Audio voice library
     "FISH_MODEL": "s2.1-pro-free",  # S2.1 Pro at $0, free on the Fish Audio API until Nov 30, 2026
-    "OPENROUTER_MODEL": "apodex/apodex-1.1-mini:free",  # the brain, free on OpenRouter
+    "OPENROUTER_MODEL": "openrouter/free",  # routes to an available free chat model on OpenRouter
     "JARVIS_CALLS_YOU": "sir",
     "PORT": "8765",
     "JARVIS_HOST": "127.0.0.1",
@@ -74,6 +74,9 @@ def load_settings() -> dict[str, str]:
     for key in ("FISH_API_KEY", "OPENROUTER_API_KEY"):
         if os.environ.get(key):
             cfg[key] = os.environ[key].strip()
+    # Migrate the old default, which OpenRouter no longer serves reliably.
+    if cfg.get("OPENROUTER_MODEL") == "apodex/apodex-1.1-mini:free":
+        cfg["OPENROUTER_MODEL"] = "openrouter/free"
     return cfg
 
 
