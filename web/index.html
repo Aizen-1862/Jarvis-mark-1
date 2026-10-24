@@ -381,7 +381,7 @@
   function isActionRequest(text) {
     const command = /^(?:please\s+)?(?:(?:can|could)\s+you\s+)?(?:please\s+)?(?:open|launch|start|run|play|check|read|summari[sz]e|review|show|fetch|retrieve|turn\s+on|turn\s+off|set|stop|pause|resume|skip|generate|create|draw|make)\b/i;
     const normalized = text.toLowerCase().replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
-    return command.test(text) || protocols.some((phrase) => normalized.includes(String(phrase).toLowerCase()));
+    return command.test(text) || protocols.some((phrase) => normalized.includes(String(phrase).toLowerCase().replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim()));
   }
 
   async function streamReply(text, replyEl) {
