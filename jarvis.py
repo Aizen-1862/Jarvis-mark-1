@@ -1084,16 +1084,16 @@ class Handler(BaseHTTPRequestHandler):
                 self._json(200, {"reply": reply, "open": [url]})
                 return
             folder_request = re.fullmatch(
-                r"(?:please\\s+)?(?:(?:can|could)\\s+you\\s+)?(?:please\\s+)?"
-                r"(?:open|show|go to|navigate to)\\s+(?:my\\s+)?(?:the\\s+)?"
-                r"(?:(?:folder|directory)\\s+)?"
-                r"(.+?)\\s+(?:folder|directory)[.!?]*",
+                r"(?:please\s+)?(?:(?:can|could)\s+you\s+)?(?:please\s+)?"
+                r"(?:open|show|go to|navigate to)\s+(?:my\s+)?(?:the\s+)?"
+                r"(?:(?:folder|directory)\s+)?"
+                r"(.+?)\s+(?:folder|directory)[.!?]*",
                 text,
                 re.IGNORECASE,
             )
             common_folder = re.fullmatch(
-                r"(?:please\\s+)?(?:open|show|go to|navigate to)\\s+(?:my\\s+)?"
-                r"(desktop|documents|downloads|pictures|music|videos)(?:\\s+folder)?[.!?]*",
+                r"(?:please\s+)?(?:open|show|go to|navigate to)\s+(?:my\s+)?"
+                r"(desktop|documents|downloads|pictures|music|videos)(?:\s+folder)?[.!?]*",
                 text,
                 re.IGNORECASE,
             )
