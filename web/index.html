@@ -494,27 +494,36 @@
   }
 
   const phoneAppMap = {
-    spotify: { android: 'intent://open.spotify.com/#Intent;scheme=https;package=com.spotify.music;end', ios: 'spotify://' },
-    youtube: { android: 'intent://www.youtube.com/#Intent;scheme=https;package=com.google.android.youtube;end', ios: 'youtube://' },
-    gmail: { android: 'intent://mail.google.com/#Intent;scheme=https;package=com.google.android.gm;end' },
-    chrome: { android: 'intent://www.google.com/#Intent;scheme=https;package=com.android.chrome;end' },
-    maps: { android: 'intent://maps.google.com/#Intent;scheme=https;package=com.google.android.apps.maps;end', ios: 'maps://' },
-    'google maps': { android: 'intent://maps.google.com/#Intent;scheme=https;package=com.google.android.apps.maps;end', ios: 'maps://' },
-    whatsapp: { android: 'intent://send/#Intent;scheme=whatsapp;package=com.whatsapp;end', ios: 'whatsapp://' },
-    instagram: { android: 'intent://instagram.com/#Intent;scheme=https;package=com.instagram.android;end', ios: 'instagram://' },
-    tiktok: { android: 'intent://www.tiktok.com/#Intent;scheme=https;package=com.zhiliaoapp.musically;end' },
-    camera: { android: 'intent:#Intent;action=android.media.action.IMAGE_CAPTURE;end' },
-    phone: { android: 'intent:#Intent;action=android.intent.action.DIAL;end', ios: 'tel:' },
-    messages: { android: 'intent:#Intent;action=android.intent.action.SENDTO;scheme=smsto;end', ios: 'sms:' },
-    settings: { android: 'intent:#Intent;action=android.settings.SETTINGS;end' },
-    photos: { android: 'intent://photos.google.com/#Intent;scheme=https;package=com.google.android.apps.photos;end' },
-    calendar: { android: 'intent://calendar.google.com/#Intent;scheme=https;package=com.google.android.calendar;end' },
+    calculator: { android: true },
+    notepad: { android: true },
+    'file explorer': { android: true },
+    paint: { android: true },
+    spotify: { android: true, ios: 'spotify://' },
+    youtube: { android: true, ios: 'youtube://' },
+    'youtube music': { android: true },
+    gmail: { android: true },
+    chrome: { android: true },
+    maps: { android: true, ios: 'maps://' },
+    'google maps': { android: true, ios: 'maps://' },
+    whatsapp: { android: true, ios: 'whatsapp://' },
+    instagram: { android: true, ios: 'instagram://' },
+    tiktok: { android: true },
+    camera: { android: true },
+    phone: { android: true, ios: 'tel:' },
+    messages: { android: true, ios: 'sms:' },
+    settings: { android: true },
+    photos: { android: true },
+    calendar: { android: true },
   };
   function phoneAppLink(app) {
     const name = app.toLowerCase().trim();
     const config = phoneAppMap[name];
     if (!config) return '';
-    if (/Android/i.test(navigator.userAgent)) return config.android || '';
+    if (/Android/i.test(navigator.userAgent)) {
+      if (!config.android) return '';
+      const fallback = encodeURIComponent('https://jarvis-mark-1-k6sq.onrender.com/');
+      return `intent://launch?app=${encodeURIComponent(name)}#Intent;scheme=jarvismobile;package=com.aizen.jarvismobile;S.browser_fallback_url=${fallback};end`;
+    }
     return config.ios || '';
   }
 
@@ -856,3 +865,4 @@
 </script>
 </body>
 </html>
+

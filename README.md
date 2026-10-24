@@ -32,6 +32,8 @@ The browser voice-input API is most consistent in desktop Chrome or Edge. Typed 
 - **Work Mode:** after Google OAuth is configured and you grant read-only permission, JARVIS summarizes up to 200 unread inbox messages. Mail content is sent to OpenRouter for summarization. It does not send, archive, delete, or modify messages.
 - **Image generation:** ask JARVIS to generate an image. The configured OpenRouter image model may charge per image; JARVIS shows the reported cost.
 - **Mobile app links:** Android has deep links for a small set of common apps; iOS support depends on app URL schemes. A web page cannot enumerate or launch every installed phone app. Computer apps still launch only through the Windows bridge on that computer.
+- **Android companion:** install the `JARVIS Mobile` debug APK from the `Build JARVIS Mobile APK` workflow artifact in GitHub Actions. Then open the hosted JARVIS page on Android and tap the `Open …` link after an app-opening command. The companion launches a fixed allowlist of apps on the phone; it does not read other app data or control playback. The APK is a test build and Android may ask you to allow installation from your browser.
 - **E-girl mode:** say `activate e-girl mode`; say `activate JARVIS mode` to restore the default persona.
 
 If a key has been exposed, revoke it at its provider and replace the value in the hosting dashboard or local `.env` file. Keep secrets out of GitHub.
+

@@ -1,0 +1,45 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <queries>
+        <package android:name="com.google.android.calculator" />
+        <package android:name="com.android.calculator2" />
+        <package android:name="com.sec.android.app.popupcalculator" />
+        <package android:name="com.google.android.keep" />
+        <package android:name="com.microsoft.paint" />
+        <package android:name="com.spotify.music" />
+        <package android:name="com.google.android.youtube" />
+        <package android:name="com.google.android.gm" />
+        <package android:name="com.android.chrome" />
+        <package android:name="com.google.android.apps.maps" />
+        <package android:name="com.whatsapp" />
+        <package android:name="com.instagram.android" />
+        <package android:name="com.zhiliaoapp.musically" />
+        <package android:name="com.google.android.apps.photos" />
+        <package android:name="com.google.android.calendar" />
+        <package android:name="com.google.android.apps.youtube.music" />
+        <package android:name="com.sec.android.app.myfiles" />
+        <package android:name="com.google.android.documentsui" />
+    </queries>
+
+    <application
+        android:allowBackup="false"
+        android:label="JARVIS Mobile"
+        android:theme="@style/AppTheme"
+        android:usesCleartextTraffic="false">
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:launchMode="singleTop">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="jarvismobile" android:host="launch" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>
+
