@@ -1106,9 +1106,14 @@ class Handler(BaseHTTPRequestHandler):
                            folder_request.group(1).strip() if folder_request else
                            common_folder.group(1).strip() if common_folder else "")
             if folder_name:
-                result = run_agent_tool("open_folder", json.dumps({"path": folder_name}))
-                reply = f"Opening the {folder_name} folder, {title}." if result.get("ok") else f"I couldn't open that folder, {title}. {result.get('error', 'Please check the folder path.')}"
-                self._json(200, {"reply": reply})
+                hosted = cfg.get("JARVIS_HOST", "127.0.0.1").strip() not in ("127.0.0.1", "::1", "localhost")
+                if hosted:
+                    reply = f"I'll ask your connected Windows bridge to open the {folder_name} folder, {title}."
+                    self._json(200, {"reply": reply, "local_actions": [{"action": "open_folder", "path": folder_name}]})
+                else:
+                    result = run_agent_tool("open_folder", json.dumps({"path": folder_name}))
+                    reply = f"Opening the {folder_name} folder, {title}." if result.get("ok") else f"I couldn't open that folder, {title}. {result.get('error', 'Please check the folder path.')}"
+                    self._json(200, {"reply": reply})
                 return
 
             app_request = re.fullmatch(
