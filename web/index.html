@@ -431,7 +431,10 @@
   }
   function localChessCommand(text) {
     const t=text.trim().toLowerCase().replace(/[.!?]+$/,'');
-    if(/^(?:open|start|play|launch)(?: a game of)? chess$|^chess(?: game)?$|^let'?s play chess$|^play chess with jarvis$/.test(t)){chessOpen();return 'Chess is ready. Choose AI mode or two-player mode on the board.';}
+    if(/^(?:two player|local) chess(?: mode)?$|^play local chess$/.test(t)){chessOpen();$('chessMode').value='local';renderChess();return 'Two-player chess is ready. Take turns on the same board.';}
+    if(/^(?:play against|challenge) jarvis(?: at)? chess$|^ai chess$|^play chess with jarvis$/.test(t)){chessOpen();$('chessMode').value='ai';renderChess();if(chessGame&&chessGame.turn()==='b'&&!chessGame.game_over())chessAiMove();return 'Challenge accepted. You are White; I will play Black.';}
+    if(/^(?:easy|medium|hard)(?: chess)? difficulty$|^(?:easy|medium|hard) chess$/.test(t)){chessOpen();$('chessMode').value='ai';$('chessDifficulty').value=t.startsWith('easy')?'easy':t.startsWith('hard')?'hard':'medium';renderChess();return 'Chess difficulty set to '+$('chessDifficulty').value+'.';}
+    if(/^(?:open|start|play|launch)(?: a game of)? chess$|^chess(?: game)?$|^let'?s play chess$/.test(t)){chessOpen();return 'Chess is ready. Choose AI mode or two-player mode on the board.';}
     if(/^(?:close|exit|hide) chess$/.test(t)){chessClose();return 'Chess board closed. Your game stays open in this session.';}
     if(!chessOverlay.classList.contains('open'))return null;
     if(/^(?:start|new|restart)(?: a)? chess game$/.test(t)){chessNewGame();return 'New chess game started.';}
@@ -450,7 +453,7 @@
   $('chessNew').addEventListener('click',chessNewGame);
   $('chessUndo').addEventListener('click',chessUndo);
   $('chessFlip').addEventListener('click',()=>{chessFlipped=!chessFlipped;renderChess();});
-  $('chessMode').addEventListener('change',()=>{chessSelected=null;chessTargets=[];renderChess();});
+  $('chessMode').addEventListener('change',()=>{chessSelected=null;chessTargets=[];renderChess();if($('chessMode').value==='ai'&&chessGame&&chessGame.turn()==='b'&&!chessGame.game_over())chessAiMove();});
   $('chessDifficulty').addEventListener('change',renderChess);
   $('chessOverlay').addEventListener('click',e=>{if(e.target===chessOverlay)chessClose();});
   $('chessPromotion').querySelectorAll('[data-promotion]').forEach(btn=>btn.addEventListener('click',()=>{if(chessPendingPromotion){chessMakeMove(chessPendingPromotion.from,chessPendingPromotion.to,btn.dataset.promotion);}}));
