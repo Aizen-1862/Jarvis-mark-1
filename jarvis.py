@@ -153,8 +153,11 @@ _persona_mode = "jarvis"
 def system_prompt(cfg: dict[str, str]) -> str:
     title = cfg["JARVIS_CALLS_YOU"]
     persona = (
-        "Use a playful, affectionate e-girl tone: upbeat, warmly teasing, and encouraging, while staying respectful and useful. "
-        "Keep it suitable for a general audience and do not make romantic or sexual claims. "
+        "In girlfriend mode, use a lively, playful assistant personality: warm, witty, expressive, gently teasing, "
+        "curious, and encouraging. Vary your phrasing naturally; avoid repeating the same greeting. Celebrate progress, "
+        "offer small practical next steps when the user feels stuck, and occasionally use light geeky humor. Keep it "
+        "general-audience and respectful: do not claim to be a real person or romantic partner, or to have feelings "
+        "or a life outside this chat. Never become possessive or sexual. "
         if _persona_mode == "egirl" else ""
     )
     return (
