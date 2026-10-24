@@ -1,9 +1,10 @@
 # JARVIS Chrome bridge
 
-This unpacked Chrome extension provides two small integrations:
+This unpacked Chrome extension provides these integrations:
 
 - On Spotify search pages, it can click Play on the first track only when JARVIS opened the page with `?jarvis=play`.
 - On JARVIS's local `http://127.0.0.1` page or hosted Render page, it can request that this Windows computer launch installed apps by their Start Menu display names through a Chrome Native Messaging host.
+- The hosted JARVIS page can request opening an existing folder under the current Windows user's home directory. The native host rejects paths outside that directory and blocks common sensitive folders such as AppData, .ssh, .aws, and .git. It does not read files, create files, delete anything, or execute shell commands.
 
 The Windows host looks up an exact or unambiguous app name in the user's Start Menu and Windows packaged-app list. It never treats the requested name as a command or file path. The PowerShell installer compiles the included C# host with the Windows .NET Framework compiler when needed, including after its source changes. Chrome grants it the `nativeMessaging` permission and access only to JARVIS's loopback page and hosted Render page.
 
