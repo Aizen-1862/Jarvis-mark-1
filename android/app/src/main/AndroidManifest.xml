@@ -1,4 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <queries>
         <package android:name="com.google.android.calculator" />
         <package android:name="com.android.calculator2" />
@@ -22,7 +24,7 @@
 
     <application
         android:allowBackup="false"
-        android:label="JARVIS Mobile"
+        android:label="J.A.R.V.I.S."
         android:theme="@style/AppTheme"
         android:usesCleartextTraffic="false">
         <activity
