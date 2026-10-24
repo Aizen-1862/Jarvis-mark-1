@@ -16,7 +16,7 @@
       window.postMessage({
         source: "JARVIS_BRIDGE",
         requestId: message.requestId,
-        result: error ? { ok: false, error: error.message } : (result || { ok: false }),
+        result: error ? { ok: false, error: error.message } : (result || { ok: false, error: "The Windows launcher returned no response." }),
       }, location.origin);
     });
   });
