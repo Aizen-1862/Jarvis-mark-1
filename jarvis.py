@@ -270,12 +270,17 @@ def run_agent_tool(name: str, raw_arguments: str) -> dict:
 def think(cfg: dict[str, str], text: str) -> tuple[str, list[str], list[str]]:
     with _lock:
         messages = list(_history) + [{"role": "user", "content": text}]
+    # Search is an explicit user action: the tool opens results but cannot read them.
+    search_requested = bool(re.search(r"\b(?:search(?: online| the web)?|look up online|google)\b", text, re.IGNORECASE))
+    available_tools = AGENT_TOOLS if search_requested else [
+        tool for tool in AGENT_TOOLS if tool["function"]["name"] != "search_web"
+    ]
     payload = {
         "model": cfg["OPENROUTER_MODEL"],
         "messages": [{"role": "system", "content": system_prompt(cfg)}, *messages],
         "max_tokens": 4000,
         "reasoning": {"effort": "none"},  # skip the thinking step, so spoken replies come back fast
-        "tools": AGENT_TOOLS,
+        "tools": available_tools,
         "tool_choice": "auto",
     }
     conversation = list(payload["messages"])
