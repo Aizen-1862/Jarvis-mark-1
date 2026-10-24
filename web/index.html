@@ -290,6 +290,17 @@
   @media(max-width:760px){.arcade-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.arcade-panel{padding:14px}.arcade-card{min-height:170px;padding:14px}}
   @media(max-width:480px){.arcade-grid{grid-template-columns:1fr}.arcade-card{min-height:130px}.arcade-overlay{padding:8px}.arcade-panel{max-height:calc(100vh - 16px)}}
 
+
+  .space-wrap { display:grid;grid-template-columns:minmax(0,1fr) 180px;gap:14px;align-items:start; }
+  .space-canvas { width:100%;display:block;aspect-ratio:16/10;border:1px solid rgba(123,255,223,.4);border-radius:10px;background:#020813;touch-action:none; }
+  .space-side { display:flex;flex-direction:column;gap:12px; }
+  .space-stat { padding:10px;border:1px solid rgba(63,216,255,.2);border-radius:9px;background:rgba(3,16,27,.8); }
+  .space-stat strong { display:block;font:700 11px Orbitron,sans-serif;color:#7bffdf;letter-spacing:.1em;margin-bottom:5px; }
+  .space-stat span { font:700 22px Orbitron,sans-serif;color:#e1fbff; }
+  .escape-terminal { border:1px solid rgba(123,255,223,.25);border-radius:10px;background:rgba(1,9,17,.9);padding:16px;font:14px/1.7 monospace;color:#9fffe0;white-space:pre-wrap; }
+  .escape-answer { width:min(300px,100%);padding:11px 12px;border:1px solid rgba(123,255,223,.4);border-radius:8px;background:#04121d;color:#e1fbff;font:600 16px Rajdhani,sans-serif; }
+  @media(max-width:680px){.space-wrap{grid-template-columns:1fr}.space-side{display:grid;grid-template-columns:repeat(3,minmax(0,1fr))}.space-stat{padding:7px}.space-stat span{font-size:17px}}
+
 </style>
 </head>
 <body class="state-idle">
@@ -300,7 +311,7 @@
       <span class="pill"><span class="dot" id="dotVoice"></span>VOICE &middot; FISH AUDIO</span>
       <span class="pill"><span class="dot" id="dotBrain"></span>BRAIN &middot; OPENROUTER</span>
     </div>
-    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap"><button class="chess-launch arcade-launch" id="arcadeShortcut" type="button">ARCADE ▷</button><button class="chess-launch" id="chessShortcut" type="button">CHESS ♟</button><a href="/lab.html" style="color:#3fd8ff;text-decoration:none;border:1px solid rgba(63,216,255,.35);border-radius:5px;padding:7px 10px;font-size:11px;letter-spacing:.08em">3D LEARNING LAB ↗</a><div id="clock"></div></div>
+    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap"><button class="chess-launch arcade-launch" id="arcadeShortcut" type="button">ARCADE ▷</button><a href="/lab.html" style="color:#3fd8ff;text-decoration:none;border:1px solid rgba(63,216,255,.35);border-radius:5px;padding:7px 10px;font-size:11px;letter-spacing:.08em">3D LEARNING LAB ↗</a><div id="clock"></div></div>
   </header>
 
   <main>
@@ -1452,10 +1463,8 @@
   }
   function arcadeLaunch(name) {
     if (name==='chess') { arcadeClose(); chessOpen(); return; }
-    if (name==='space' || name==='escape') {
-      arcadeStageView(name==='space'?'SPACE DEFENDER':'CYBER ESCAPE','<p>This simulation is reserved for a future expansion. The Arcade Hub is ready for more games.</p><div class="arcade-controls"><button class="chess-btn" type="button" data-arcade-back>BACK TO HUB</button></div>');
-      return;
-    }
+    if (name==='space') { arcadeStartSpaceDefender(); return; }
+    if (name==='escape') { arcadeStartCyberEscape(); return; }
     if (name==='reaction') {
       arcadeStageView('REACTION TEST','<div class="arcade-status" id="reactionStatus">Press START, then wait for the panel to turn green. Click only when it does.</div><div id="reactionPad" style="display:grid;place-items:center;min-height:150px;margin-top:14px;border:1px solid rgba(63,216,255,.3);border-radius:12px;background:rgba(8,34,49,.8);font:700 18px Orbitron,sans-serif;color:#7bffdf;text-align:center;cursor:pointer">READY WHEN YOU ARE</div><div class="arcade-controls"><button class="chess-btn" type="button" id="reactionStart">START TEST</button><span class="arcade-small" id="reactionBest"></span></div><div class="arcade-controls"><button class="chess-btn" type="button" data-arcade-back>BACK TO HUB</button></div>');
       const best=Number(localStorage.getItem('jarvis_arcade_reaction_best')||0);
@@ -1537,13 +1546,79 @@
     else status.textContent='Attempt '+arcadeCodeAttempts+' of 10. Keep decoding.';
   }
 
+
+  // ---- Space Defender: lightweight canvas arcade game, self-contained in the Arcade Hub.
+  let spaceState=null, spaceFrame=0, spaceLast=0;
+  function arcadeStartSpaceDefender() {
+    if(spaceFrame)cancelAnimationFrame(spaceFrame);
+    arcadeStageView('SPACE DEFENDER','<p>Defend the sector. Move with <b>← →</b> or <b>A / D</b>, fire with <b>SPACE</b>. On touchscreens, drag on the battlefield and tap FIRE.</p><div class="space-wrap"><canvas id="spaceCanvas" class="space-canvas" width="800" height="500" aria-label="Space Defender game battlefield"></canvas><div class="space-side"><div class="space-stat"><strong>SCORE</strong><span id="spaceScore">0</span></div><div class="space-stat"><strong>SECTOR</strong><span id="spaceWave">1</span></div><div class="space-stat"><strong>SHIELDS</strong><span id="spaceLives">3</span></div><button class="chess-btn" id="spaceFire" type="button">FIRE ✦</button><button class="chess-btn" id="spaceRestart" type="button">RESTART</button><button class="chess-btn" type="button" data-arcade-back>BACK TO HUB</button></div></div><div class="arcade-small" style="margin-top:10px">Tip: keep moving. Enemy formations speed up as you clear each wave.</div>');
+    const canvas=$('spaceCanvas'),ctx=canvas.getContext('2d');
+    spaceState={x:400,y:438,keys:{},shots:[],enemies:[],particles:[],score:0,lives:3,wave:1,spawn:0,over:false,lastShot:0,touch:false};
+    const st=spaceState;
+    const spawn=()=>{st.enemies=[];const rows=Math.min(2+Math.floor((st.wave-1)/2),4),cols=7;for(let r=0;r<rows;r++)for(let c=0;c<cols;c++)st.enemies.push({x:95+c*100+(r%2)*12,y:45+r*42,w:25,h:20,alive:true,phase:Math.random()*6});};
+    spawn();
+    const draw=(now)=>{
+      if(!document.getElementById('spaceCanvas')||!spaceState)return;
+      const w=canvas.width,h=canvas.height,dt=Math.min((now-spaceLast)/16.67||1,2.4);spaceLast=now;
+      ctx.clearRect(0,0,w,h);ctx.fillStyle='#020813';ctx.fillRect(0,0,w,h);
+      for(let i=0;i<75;i++){const x=(i*137+Math.floor(now/70)*(i%3+1))%w,y=(i*83+Math.floor(now/35)*(i%4+1))%h;ctx.fillStyle=i%5===0?'#7bffdf':'#3a7891';ctx.globalAlpha=.2+(i%4)*.15;ctx.fillRect(x,y,i%5===0?2:1,i%5===0?2:1);}ctx.globalAlpha=1;
+      if(!st.over){
+        if(st.keys.ArrowLeft||st.keys.a||st.keys.A)st.x-=6*dt;
+        if(st.keys.ArrowRight||st.keys.d||st.keys.D)st.x+=6*dt;
+        st.x=Math.max(24,Math.min(w-24,st.x));
+        if((st.keys[' ']||st.keys.Space)&&now-st.lastShot>230){st.shots.push({x:st.x,y:st.y-17});st.lastShot=now;}
+        st.shots.forEach(b=>b.y-=9*dt);st.shots=st.shots.filter(b=>b.y>-10);
+        const speed=(.45+st.wave*.12)*dt;
+        st.enemies.forEach(e=>{if(e.alive){e.x+=Math.sin(now/520+e.phase)*speed*2.2;e.y+=speed*.16;if(e.y>st.y-30){e.alive=false;st.lives--;}}});
+        st.shots.forEach(b=>st.enemies.forEach(e=>{if(e.alive&&Math.abs(b.x-e.x)<20&&Math.abs(b.y-e.y)<17){e.alive=false;b.y=-30;st.score+=10;for(let i=0;i<5;i++)st.particles.push({x:e.x,y:e.y,vx:(Math.random()-.5)*4,vy:(Math.random()-.5)*4,life:18});}}));
+        st.particles.forEach(p=>{p.x+=p.vx;p.y+=p.vy;p.life--;});st.particles=st.particles.filter(p=>p.life>0);
+        if(st.enemies.every(e=>!e.alive)){st.wave++;spawn();}
+        if(st.lives<=0){st.lives=0;st.over=true;}
+      }
+      // Player ship
+      ctx.save();ctx.translate(st.x,st.y);ctx.shadowBlur=18;ctx.shadowColor='#7bffdf';ctx.fillStyle='#7bffdf';ctx.beginPath();ctx.moveTo(0,-22);ctx.lineTo(18,15);ctx.lineTo(0,8);ctx.lineTo(-18,15);ctx.closePath();ctx.fill();ctx.restore();
+      st.shots.forEach(b=>{ctx.shadowBlur=12;ctx.shadowColor='#7bffdf';ctx.fillStyle='#dffff7';ctx.fillRect(b.x-2,b.y,4,13);});ctx.shadowBlur=0;
+      st.enemies.forEach(e=>{if(!e.alive)return;ctx.shadowBlur=10;ctx.shadowColor='#ff647c';ctx.fillStyle='#ff647c';ctx.fillRect(e.x-13,e.y-9,26,18);ctx.fillStyle='#290c22';ctx.fillRect(e.x-7,e.y-3,4,4);ctx.fillRect(e.x+3,e.y-3,4,4);});ctx.shadowBlur=0;
+      st.particles.forEach(p=>{ctx.globalAlpha=Math.max(0,p.life/18);ctx.fillStyle='#ffb347';ctx.fillRect(p.x,p.y,3,3);});ctx.globalAlpha=1;
+      if(st.over){ctx.fillStyle='rgba(0,5,14,.76)';ctx.fillRect(0,0,w,h);ctx.textAlign='center';ctx.fillStyle='#ff647c';ctx.font='bold 36px Orbitron, sans-serif';ctx.fillText('SECTOR LOST',w/2,h/2-10);ctx.fillStyle='#d9f6ff';ctx.font='20px Rajdhani, sans-serif';ctx.fillText('Score '+st.score+' · Press RESTART',w/2,h/2+28);}
+      $('spaceScore').textContent=st.score;$('spaceWave').textContent=st.wave;$('spaceLives').textContent=st.lives;
+      spaceFrame=requestAnimationFrame(draw);
+    };
+    spaceLast=performance.now();spaceFrame=requestAnimationFrame(draw);
+    const fire=()=>{if(spaceState&&!spaceState.over&&performance.now()-spaceState.lastShot>180){spaceState.shots.push({x:spaceState.x,y:spaceState.y-17});spaceState.lastShot=performance.now();}};
+    $('spaceFire').onclick=fire;
+    canvas.onpointerdown=e=>{st.touch=true;canvas.setPointerCapture?.(e.pointerId);const r=canvas.getBoundingClientRect();st.x=(e.clientX-r.left)/r.width*canvas.width;fire();};
+    canvas.onpointermove=e=>{if(st.touch){const r=canvas.getBoundingClientRect();st.x=(e.clientX-r.left)/r.width*canvas.width;}};
+    canvas.onpointerup=()=>{st.touch=false;};
+    $('spaceRestart').onclick=arcadeStartSpaceDefender;
+  }
+  document.addEventListener('keydown',e=>{
+    if(!spaceState||!document.getElementById('spaceCanvas'))return;
+    if(['ArrowLeft','ArrowRight',' '].includes(e.key))e.preventDefault();
+    spaceState.keys[e.key]=true;spaceState.keys[e.code]=true;
+  });
+  document.addEventListener('keyup',e=>{if(spaceState){spaceState.keys[e.key]=false;spaceState.keys[e.code]=false;}});
+  // ---- Cyber Escape: a three-stage, answer-driven escape room.
+  const escapePuzzles=[
+    {title:'ROOM 01 · THE ACCESS PANEL',terminal:'SECURITY TERMINAL // ACCESS DENIED\nA keypad shows: 2, 4, 8, 16, ?\n\nFind the next number in the sequence.',answers:['32'],hint:'Each number doubles.',success:'Pattern recognized. Door 1 unlocked.'},
+    {title:'ROOM 02 · THE SIGNAL',terminal:'SIGNAL INTERCEPT // ENCRYPTED\nDecode this simple shift: each letter moves one step forward.\n\nThe transmitted word is: DPPM\nWhat was the original word?',answers:['cool'],hint:'Move every letter one step backward.',success:'Signal decoded. Door 2 unlocked.'},
+    {title:'ROOM 03 · FINAL OVERRIDE',terminal:'CORE OVERRIDE // FINAL LOCK\nThree switches have values 3, 5, and 8.\nThe access key is their sum multiplied by 2.\n\nEnter the final numeric key.',answers:['32'],hint:'Add the values first, then multiply by two.',success:'OVERRIDE ACCEPTED. ESCAPE COMPLETE.'}
+  ];
+  let escapeIndex=0,escapeSolved=0,escapeTimer=null;
+  function arcadeStartCyberEscape(){
+    if(escapeTimer)clearInterval(escapeTimer);escapeIndex=0;escapeSolved=0;
+    arcadeStageView('CYBER ESCAPE','<div class="arcade-status" id="escapeStatus">Three security rooms stand between you and the core.</div><div class="escape-terminal" id="escapeTerminal"></div><div class="arcade-controls"><input class="escape-answer" id="escapeAnswer" autocomplete="off" placeholder="ENTER SOLUTION" aria-label="Puzzle solution"><button class="chess-btn" id="escapeSubmit" type="button">SUBMIT</button><button class="chess-btn" id="escapeHint" type="button">HINT</button></div><div class="arcade-controls"><span class="arcade-small" id="escapeProgress">ROOM 1 OF 3</span><button class="chess-btn" type="button" data-arcade-back>BACK TO HUB</button><button class="chess-btn" id="escapeRestart" type="button">RESTART</button></div>');
+    const show=()=>{const p=escapePuzzles[escapeIndex];$('escapeTerminal').textContent=p.terminal;$('escapeStatus').textContent='Solve the room to proceed.';$('escapeProgress').textContent='ROOM '+(escapeIndex+1)+' OF '+escapePuzzles.length;$('escapeAnswer').value='';$('escapeAnswer').disabled=false;$('escapeSubmit').disabled=false;};
+    const submit=()=>{const p=escapePuzzles[escapeIndex];if(p.answers.includes($('escapeAnswer').value.trim().toLowerCase())){escapeSolved++;$('escapeStatus').textContent=p.success;if(escapeIndex===escapePuzzles.length-1){$('escapeTerminal').textContent+='\n\nALL LOCKS CLEARED // ESCAPE COMPLETE';$('escapeAnswer').disabled=true;$('escapeSubmit').disabled=true;$('escapeProgress').textContent='MISSION COMPLETE · '+escapeSolved+'/3';}else{escapeIndex++;setTimeout(()=>{if($('escapeTerminal'))show();},850);}}else{$('escapeStatus').textContent='Access denied. Recheck the clues and try again.';}};
+    $('escapeSubmit').onclick=submit;$('escapeAnswer').onkeydown=e=>{if(e.key==='Enter')submit();};$('escapeHint').onclick=()=>{$('escapeStatus').textContent='HINT: '+escapePuzzles[escapeIndex].hint;};$('escapeRestart').onclick=arcadeStartCyberEscape;show();
+  }
+
   $('arcadeShortcut').addEventListener('click', arcadeOpen);
   $('arcadeClose').addEventListener('click', arcadeClose);
   $('arcadeHome').addEventListener('click', arcadeHome);
   arcadeGrid.addEventListener('click',e=>{const card=e.target.closest('[data-arcade-game]');if(card)arcadeLaunch(card.dataset.arcadeGame);});
   arcadeStage.addEventListener('click',e=>{if(e.target.closest('[data-arcade-back]'))arcadeHome();});
   arcadeOverlay.addEventListener('click',e=>{if(e.target===arcadeOverlay)arcadeClose();});
-  $('chessShortcut').addEventListener('click', chessOpen);
   $('wake').addEventListener('click', () => {
     $('wake').remove();
     initAudio();
