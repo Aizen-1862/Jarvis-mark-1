@@ -55,7 +55,34 @@ function tube(name,a,b,r,material,part){const start=new THREE.Vector3(...a),end=
 function clearWorld(){for(const o of [...world.children]){world.remove(o);o.traverse(n=>{if(n.geometry)n.geometry.dispose();if(n.material){if(Array.isArray(n.material))n.material.forEach(m=>m.dispose());else n.material.dispose()}})}active=[];pickables=[];if(loaded){scene.remove(loaded);loaded=null}if(objectUrl){URL.revokeObjectURL(objectUrl);objectUrl=null}}
 function buildAtom(){ball('Nucleus',.48,mat.orange,[0,0,0],'Nucleus');for(let i=0;i<8;i++){const a=i*2.4,r=i%2?.27:.14;ball(i%2?'Neutron':'Proton',.14,i%2?mat.white:mat.red,[Math.cos(a)*r,Math.sin(a)*r,(i%3-1)*.13],i%2?'Neutrons':'Protons')}for(let i=0;i<3;i++){ring('Electron orbit',1.55,mat.cyan,[i*.8,i*1.1,i*.45],'Electron paths');const a=i*2.1;ball('Electron',.085,mat.white,[Math.cos(a)*1.55,Math.sin(a)*1.1,Math.sin(a*.8)*.7],'Electron paths')}}
 function buildSolar(){ball('Sun',.65,mat.orange,[0,0,0],'Sun');[1.15,1.55,1.95,2.4,3.1,3.8].forEach((r,i)=>{ring('Orbit',r,mat.cyan,[Math.PI/2,0,0],'Orbits');ball('Planet',i===4?.22:.1,[mat.white,mat.orange,mat.blue,mat.red,mat.orange,mat.cyan][i],[r,0,0],i<3?'Inner planets':'Outer planets')})}
-function buildEngine(){mesh(new THREE.CylinderGeometry(.72,.72,1.8,32),mat.dark,'Cylinder',[0,.25,0],'Cylinder');mesh(new THREE.CylinderGeometry(.55,.55,.28,32),mat.cyan,'Piston',[0,.25,0],'Piston');tube('Connecting rod',[0,.05,0],[.28,-1.1,0],.1,mat.white,'Connecting rod');mesh(new THREE.CylinderGeometry(.13,.13,1.4,24),mat.orange,'Crankshaft',[0,-1.35,0],'Crankshaft',[1,1,1]).rotation.z=Math.PI/2;ball('Crank pin',.15,mat.orange,[.3,-1.35,0],'Crankshaft')}
+function buildEngine(){
+const alloy=new THREE.MeshStandardMaterial({color:0x8b9ca5,metalness:.85,roughness:.28});
+const cast=new THREE.MeshStandardMaterial({color:0x344652,metalness:.7,roughness:.4});
+const black=new THREE.MeshStandardMaterial({color:0x121920,metalness:.3,roughness:.5});
+const silver=new THREE.MeshStandardMaterial({color:0xc5d0d5,metalness:.9,roughness:.22});
+mesh(new THREE.BoxGeometry(1.7,1.2,1.05),cast,'V6 crankcase',[0,-.05,0],'Cylinder banks');
+mesh(new THREE.BoxGeometry(1.35,.34,.82),black,'Oil pan',[0,-.78,0],'Oil pan');
+for(const side of [-1,1]){
+ for(let i=0;i<3;i++){
+  const x=(i-1)*.43+side*.25,z=side*.23;
+  const barrel=mesh(new THREE.CylinderGeometry(.18,.2,.72,28),alloy,'Cylinder barrel',[x,.35,z],'Cylinder banks');barrel.rotation.z=side*.35;
+  const head=mesh(new THREE.BoxGeometry(.4,.22,.6),cast,'Cylinder head',[x,.82,z],'Cylinder heads');head.rotation.z=-side*.35;
+  const cover=mesh(new THREE.BoxGeometry(.34,.11,.52),black,'Valve cover',[x,1,z],'Cylinder heads');cover.rotation.z=-side*.35;
+  tube('Exhaust header',[x,.16,z],[x+side*.3,-.2,z],.05,silver,'Exhaust headers');
+  tube('Intake runner',[x,.9,z],[x*.65,1.18,z],.055,alloy,'Intake manifold');
+  ball('Head fastener',.035,silver,[x,.92,z],'Cylinder heads');
+ }
+}
+mesh(new THREE.CylinderGeometry(.22,.22,1.1,28),alloy,'Intake plenum',[0,1.34,0],'Intake manifold',[0,0,Math.PI/2]);
+mesh(new THREE.CylinderGeometry(.29,.29,.18,32),black,'Crank pulley',[0,-.4,.65],'Crankshaft',[Math.PI/2,0,0]);
+mesh(new THREE.CylinderGeometry(.2,.2,.26,28),alloy,'Alternator',[-.6,.18,.65],'Crankshaft',[Math.PI/2,0,0]);
+mesh(new THREE.CylinderGeometry(.14,.14,.12,28),silver,'Idler pulley',[.52,.2,.65],'Crankshaft',[Math.PI/2,0,0]);
+tube('Accessory belt',[-.6,.18,.81],[0,-.4,.81],.04,black,'Crankshaft');
+tube('Accessory belt',[0,-.4,.81],[.52,.2,.81],.04,black,'Crankshaft');
+mesh(new THREE.BoxGeometry(1.35,.92,.12),cast,'Timing cover',[0,.04,.54],'Crankshaft');
+mesh(new THREE.CylinderGeometry(.1,.1,.28,24),mat.blue,'Oil filter',[-.82,-.6,.03],'Oil pan',[0,0,Math.PI/2]);
+mesh(new THREE.BoxGeometry(1.95,.1,1.2),black,'Engine mount',[0,-1,0],'Cylinder banks');
+}
 function buildMolecule(){ball('Oxygen',.48,mat.red,[0,0,0],'Oxygen');tube('O-H bond',[0,0,0],[-.9,.65,0],.075,mat.white,'Covalent bonds');tube('O-H bond',[0,0,0],[.9,.65,0],.075,mat.white,'Covalent bonds');ball('Hydrogen',.27,mat.white,[-.9,.65,0],'Hydrogen');ball('Hydrogen',.27,mat.white,[.9,.65,0],'Hydrogen')}
 function buildEarth(){ball('Earth',1.2,mat.blue,[0,0,0],'Crust');for(let i=0;i<9;i++){const a=i*2.4,lat=(i%5-2)*.4;const p=ball('Illustrative land',.17,mat.green,[Math.cos(a)*Math.cos(lat)*1.17,Math.sin(lat)*1.17,Math.sin(a)*Math.cos(lat)*1.17],'Crust');p.scale.set(1.3,.4,.8)}ring('Atmosphere',1.3,mat.cyan,[.2,.3,0],'Atmosphere')}
 function fillParts(){const info=data[selectedModel];$('partList').replaceChildren();[['Overview',info?.description||'Imported local model.'],...(info?.parts||[['Imported model','Loaded from a local file.']])].forEach(pair=>{const b=document.createElement('button');b.className='part-btn'+(selectedPart===pair[0]?' active':'');b.textContent=pair[0];b.addEventListener('click',()=>{selectedPart=pair[0];$('description').textContent=pair[1];fillParts();$('objectStatus').textContent='PART: '+pair[0].toUpperCase()});$('partList').append(b)})}
