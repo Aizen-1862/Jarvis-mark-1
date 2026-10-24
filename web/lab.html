@@ -80,7 +80,27 @@ function makeSurfaceTexture(kind){
  const texture=new THREE.CanvasTexture(canvas);texture.colorSpace=THREE.SRGBColorSpace;texture.anisotropy=8;return texture;
 }
 function buildAtom(){ball('Nucleus',.48,mat.orange,[0,0,0],'Nucleus');for(let i=0;i<8;i++){const a=i*2.4,r=i%2?.27:.14;ball(i%2?'Neutron':'Proton',.14,i%2?mat.white:mat.red,[Math.cos(a)*r,Math.sin(a)*r,(i%3-1)*.13],i%2?'Neutrons':'Protons')}for(let i=0;i<3;i++){ring('Electron orbit',1.55,mat.cyan,[i*.8,i*1.1,i*.45],'Electron paths');const a=i*2.1;ball('Electron',.085,mat.white,[Math.cos(a)*1.55,Math.sin(a)*1.1,Math.sin(a*.8)*.7],'Electron paths')}}
-function buildSolar(){ball('Sun',.65,mat.orange,[0,0,0],'Sun');[1.15,1.55,1.95,2.4,3.1,3.8].forEach((r,i)=>{ring('Orbit',r,mat.cyan,[Math.PI/2,0,0],'Orbits');ball('Planet',i===4?.22:.1,[mat.white,mat.orange,mat.blue,mat.red,mat.orange,mat.cyan][i],[r,0,0],i<3?'Inner planets':'Outer planets')})}
+function buildSolar(){
+ const sunMat=new THREE.MeshStandardMaterial({map:makeSurfaceTexture('sun'),emissive:0xff6a13,emissiveIntensity:1.25,roughness:.85});
+ ball('Sun',.68,sunMat,[0,0,0],'Sun');
+ const glow=new THREE.Mesh(new THREE.SphereGeometry(.77,48,32),new THREE.MeshBasicMaterial({color:0xff8a21,transparent:true,opacity:.09,side:THREE.BackSide}));glow.name='Solar glow';world.add(glow);active.push(glow);
+ const planets=[
+  {r:1.12,size:.075,kind:'moon',part:'Inner planets'},
+  {r:1.52,size:.12,kind:'gas',part:'Inner planets'},
+  {r:1.98,size:.13,kind:'earth',part:'Inner planets'},
+  {r:2.48,size:.1,kind:'mars',part:'Inner planets'},
+  {r:3.16,size:.31,kind:'gas',part:'Outer planets'},
+  {r:3.92,size:.26,kind:'ice',part:'Outer planets'}
+ ];
+ planets.forEach((p,i)=>{
+  const orbit=new THREE.Mesh(new THREE.TorusGeometry(p.r,.008,6,160),new THREE.MeshBasicMaterial({color:0x6b8798,transparent:true,opacity:.38}));
+  orbit.rotation.x=Math.PI/2;orbit.name='Orbit';orbit.userData.part='Orbits';world.add(orbit);active.push(orbit);pickables.push(orbit);
+  const material=new THREE.MeshStandardMaterial({map:makeSurfaceTexture(p.kind),roughness:.78,metalness:.02});
+  const planet=ball(['Mercury','Venus','Earth','Mars','Jupiter','Neptune'][i],p.size,material,[p.r,0,0],p.part);
+  if(i===2){const clouds=new THREE.Mesh(new THREE.SphereGeometry(p.size*1.025,40,28),new THREE.MeshStandardMaterial({color:0xeaf8ff,transparent:true,opacity:.13,roughness:1}));clouds.name='Cloud layer';clouds.position.copy(planet.position);clouds.userData.part='Inner planets';world.add(clouds);active.push(clouds)}
+  if(i===4){const bands=new THREE.Mesh(new THREE.TorusGeometry(p.size*1.28,.012,6,80),new THREE.MeshStandardMaterial({color:0xcab28a,roughness:.8}));bands.rotation.x=Math.PI/2;bands.position.copy(planet.position);bands.userData.part='Outer planets';world.add(bands);active.push(bands)}
+ });
+}
 function buildEngine(){
 const alloy=new THREE.MeshStandardMaterial({color:0x8b9ca5,metalness:.85,roughness:.28});
 const cast=new THREE.MeshStandardMaterial({color:0x344652,metalness:.7,roughness:.4});
@@ -110,7 +130,15 @@ mesh(new THREE.CylinderGeometry(.1,.1,.28,24),mat.blue,'Oil filter',[-.82,-.6,.0
 mesh(new THREE.BoxGeometry(1.95,.1,1.2),black,'Engine mount',[0,-1,0],'Cylinder banks');
 }
 function buildMolecule(){ball('Oxygen',.48,mat.red,[0,0,0],'Oxygen');tube('O-H bond',[0,0,0],[-.9,.65,0],.075,mat.white,'Covalent bonds');tube('O-H bond',[0,0,0],[.9,.65,0],.075,mat.white,'Covalent bonds');ball('Hydrogen',.27,mat.white,[-.9,.65,0],'Hydrogen');ball('Hydrogen',.27,mat.white,[.9,.65,0],'Hydrogen')}
-function buildEarth(){ball('Earth',1.2,mat.blue,[0,0,0],'Crust');for(let i=0;i<9;i++){const a=i*2.4,lat=(i%5-2)*.4;const p=ball('Illustrative land',.17,mat.green,[Math.cos(a)*Math.cos(lat)*1.17,Math.sin(lat)*1.17,Math.sin(a)*Math.cos(lat)*1.17],'Crust');p.scale.set(1.3,.4,.8)}ring('Atmosphere',1.3,mat.cyan,[.2,.3,0],'Atmosphere')}
+function buildEarth(){
+ const earthMat=new THREE.MeshStandardMaterial({map:makeSurfaceTexture('earth'),roughness:.86,metalness:.01});
+ const globe=ball('Earth',1.2,earthMat,[0,0,0],'Crust');
+ const cloudMat=new THREE.MeshStandardMaterial({map:makeSurfaceTexture('ice'),color:0xc9e5ef,transparent:true,opacity:.17,roughness:1,depthWrite:false});
+ const clouds=new THREE.Mesh(new THREE.SphereGeometry(1.225,64,48),cloudMat);clouds.name='Cloud layer';clouds.userData.part='Atmosphere';world.add(clouds);active.push(clouds);pickables.push(clouds);
+ const atmosphere=new THREE.Mesh(new THREE.SphereGeometry(1.29,64,48),new THREE.MeshBasicMaterial({color:0x53bfff,transparent:true,opacity:.075,side:THREE.BackSide,depthWrite:false}));atmosphere.name='Atmosphere';atmosphere.userData.part='Atmosphere';world.add(atmosphere);active.push(atmosphere);pickables.push(atmosphere);
+ // Thin latitude and longitude guides make the globe easier to inspect.
+ for(let lat=-60;lat<=60;lat+=30){const r=1.205*Math.cos(THREE.MathUtils.degToRad(lat));const y=1.205*Math.sin(THREE.MathUtils.degToRad(lat));const line=new THREE.Mesh(new THREE.TorusGeometry(Math.max(.01,r),.003,4,100),new THREE.MeshBasicMaterial({color:0x9bdcff,transparent:true,opacity:.22}));line.position.y=y;line.rotation.x=Math.PI/2;line.name='Latitude guide';line.userData.part='Crust';world.add(line);active.push(line)}
+}
 function fillParts(){const info=data[selectedModel];$('partList').replaceChildren();[['Overview',info?.description||'Imported local model.'],...(info?.parts||[['Imported model','Loaded from a local file.']])].forEach(pair=>{const b=document.createElement('button');b.className='part-btn'+(selectedPart===pair[0]?' active':'');b.textContent=pair[0];b.addEventListener('click',()=>{selectedPart=pair[0];$('description').textContent=pair[1];fillParts();$('objectStatus').textContent='PART: '+pair[0].toUpperCase()});$('partList').append(b)})}
 function showModel(key){clearWorld();selectedModel=key;selectedPart='Overview';const d=data[key];$('viewerTitle').textContent=d.title;$('description').textContent=d.description;if(key==='atom')buildAtom();if(key==='solar')buildSolar();if(key==='engine')buildEngine();if(key==='molecule')buildMolecule();if(key==='earth')buildEarth();world.rotation.set(0,0,0);world.scale.setScalar(key==='solar'?.75:1);camera.position.set(0,2.1,key==='solar'?9:6.2);controls.target.set(0,0,0);controls.update();fillParts();document.querySelectorAll('.model-btn').forEach(b=>b.classList.toggle('active',b.dataset.model===key));$('objectStatus').textContent='OBJECT READY'}
 function resize(){const w=wrap.clientWidth,h=wrap.clientHeight;if(!w||!h)return;camera.aspect=w/h;camera.updateProjectionMatrix();renderer.setSize(w,h,false)}new ResizeObserver(resize).observe(wrap);resize();
