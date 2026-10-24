@@ -364,8 +364,11 @@
   function launchNativeApp(app) {
     return new Promise((resolve) => {
       const requestId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      let responseTimer;
+      const failures = [];
       const finish = (result) => {
         window.removeEventListener('message', onMessage);
+        clearTimeout(responseTimer);
         clearTimeout(timeout);
         resolve(result);
       };
@@ -373,7 +376,15 @@
         if (event.source !== window || event.origin !== location.origin) return;
         const message = event.data;
         if (message?.source !== 'JARVIS_BRIDGE' || message.requestId !== requestId) return;
-        finish(message.result || { ok: false, error: 'No launch confirmation received.' });
+        const result = message.result || { ok: false, error: 'No launch confirmation received.' };
+        if (result.ok) {
+          finish(result);
+          return;
+        }
+        failures.push(result);
+        // An older installed extension can reject the native host before the
+        // current extension returns success. Give the other bridge a moment.
+        if (!responseTimer) responseTimer = setTimeout(() => finish(failures[0]), 900);
       };
       // Windows may take several seconds to wake or launch a packaged app; don't
       // report a missing bridge while the native host is still completing launch.
