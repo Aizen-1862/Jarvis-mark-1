@@ -384,6 +384,12 @@
         <button class="arcade-card" type="button" data-arcade-game="snake"><span class="arcade-icon">🐍</span><strong>SNAKE.exe</strong><span>Collect energy, grow longer, and don't hit the walls.</span><span class="arcade-tag">PLAY NOW</span></button>
         <button class="arcade-card" type="button" data-arcade-game="pong"><span class="arcade-icon">◉</span><strong>NEON PONG</strong><span>Face the JARVIS paddle in a neon table-tennis duel.</span><span class="arcade-tag">PLAY NOW</span></button>
         <button class="arcade-card" type="button" data-arcade-game="racer"><span class="arcade-icon">🏎</span><strong>CYBER RACER</strong><span>Dodge traffic, survive the highway, and chase a high score.</span><span class="arcade-tag">PLAY NOW</span></button>
+        <button class="arcade-card" type="button" data-arcade-game="zombie"><span class="arcade-icon">☣</span><strong>LAST STAND: Z</strong><span>Survive the infected wave and collect points.</span><span class="arcade-tag">SURVIVAL MODE</span></button>
+        <button class="arcade-card" type="button" data-arcade-game="pong2"><span class="arcade-icon">↔</span><strong>DUEL PONG</strong><span>Two players, one keyboard, first to five wins.</span><span class="arcade-tag">LOCAL MULTIPLAYER</span></button>
+        <button class="arcade-card" type="button" data-arcade-game="racerpro"><span class="arcade-icon">🏁</span><strong>RACER: OVERDRIVE</strong><span>Accelerating traffic, tighter lanes, and a survival score.</span><span class="arcade-tag">ARCADE RACING</span></button>
+        <button class="arcade-card" type="button" data-arcade-game="invaders"><span class="arcade-icon">👾</span><strong>SPACE INVADERS: BOSS</strong><span>Clear enemy waves and take down the boss ship.</span><span class="arcade-tag">BOSS FIGHT</span></button>
+        <button class="arcade-card" type="button" data-arcade-game="mines"><span class="arcade-icon">▦</span><strong>MINESWEEPER</strong><span>Reveal safe tiles and flag every hidden mine.</span><span class="arcade-tag">LOGIC PUZZLE</span></button>
+        <button class="arcade-card" type="button" data-arcade-game="ninja"><span class="arcade-icon">忍</span><strong>NEON NINJA</strong><span>Jump between platforms, avoid hazards, and go for distance.</span><span class="arcade-tag">PLATFORM RUN</span></button>
       </div>
       <div class="arcade-stage" id="arcadeStage" hidden></div>
       <div class="arcade-small" style="margin-top:16px">ARCADE SYSTEM · MORE SIMULATIONS CAN BE ADDED HERE WITHOUT CROWDING THE MAIN HUD</div>
@@ -1477,6 +1483,7 @@
     if (arcadeMathTimer) { clearInterval(arcadeMathTimer); arcadeMathTimer=null; }
     if (name==='chess') { arcadeClose(); chessOpen(); return; }
     if (name==='space') { arcadeStartSpaceDefender(); return; }
+    if (['zombie','pong2','racerpro','invaders','mines','ninja'].includes(name)) { arcadeStartExtraGame(name); return; }
     if (name==='snake'||name==='pong'||name==='racer') { arcadeStartCanvasGame(name); return; }
     if (name==='escape') { arcadeStartCyberEscape(); return; }
     if (name==='reaction') {
@@ -1630,6 +1637,81 @@
 
   // ---- Space Defender: lightweight canvas arcade game, self-contained in the Arcade Hub.
   let spaceState=null, spaceFrame=0, spaceLast=0;
+  function arcadeStartExtraGame(kind) {
+    if(arcadeCanvasFrame) cancelAnimationFrame(arcadeCanvasFrame);
+    if(arcadeCanvasKeyHandler) document.removeEventListener('keydown',arcadeCanvasKeyHandler);
+    if(kind==='mines') {
+      const size=10,total=size*size,mineCount=14;
+      let mines=new Set(),revealed=new Set(),flags=new Set(),ended=false;
+      function reset(){mines=new Set();revealed=new Set();flags=new Set();ended=false;while(mines.size<mineCount)mines.add(Math.floor(Math.random()*total));render();}
+      function neighbors(i){let x=i%size,y=Math.floor(i/size),a=[];for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){let nx=x+dx,ny=y+dy;if((dx||dy)&&nx>=0&&nx<size&&ny>=0&&ny<size)a.push(ny*size+nx);}return a;}
+      function flood(i){if(i<0||i>=total||revealed.has(i)||flags.has(i)||mines.has(i))return;revealed.add(i);if(neighbors(i).filter(n=>mines.has(n)).length===0)neighbors(i).forEach(n=>flood(n));}
+      function render(){
+        const safe=total-mineCount,won=revealed.size===safe;
+        $('arcadeStage').innerHTML='<div class="arcade-status" id="mineStatus">'+(ended?'MINE DETONATED — TRY AGAIN':won?'SECTOR CLEARED — ALL SAFE TILES FOUND':'LEFT CLICK / TAP TO REVEAL · RIGHT CLICK TO FLAG')+'</div><div id="mineBoard" style="display:grid;grid-template-columns:repeat(10,minmax(0,1fr));gap:4px;max-width:520px;margin:14px auto"></div><div class="arcade-controls"><span class="arcade-small">MINES: '+mineCount+' · FLAGS: '+flags.size+'</span><button class="chess-btn" id="mineReset" type="button">NEW FIELD</button><button class="chess-btn" type="button" data-arcade-back>BACK TO HUB</button></div>';
+        const board=$('mineBoard');
+        for(let i=0;i<total;i++){const b=document.createElement('button');b.type='button';b.textContent=flags.has(i)?'⚑':revealed.has(i)?(mines.has(i)?'✹':(neighbors(i).filter(n=>mines.has(n)).length||'·')):' ';b.style.cssText='aspect-ratio:1;min-width:0;border:1px solid rgba(63,216,255,.25);border-radius:5px;background:'+(revealed.has(i)?'#12283a':'#071522')+';color:#7bffdf;font-weight:800;font-size:clamp(10px,2.5vw,16px);cursor:pointer';b.onclick=()=>{if(ended||won)return;if(flags.has(i))return;if(mines.has(i)){revealed.add(i);ended=true;mines.forEach(m=>revealed.add(m));render();return;}flood(i);render();};b.oncontextmenu=e=>{e.preventDefault();if(ended||won||revealed.has(i))return;flags.has(i)?flags.delete(i):flags.add(i);render();};board.appendChild(b);}
+        $('mineReset').onclick=reset;
+      }
+      arcadeStageView('MINESWEEPER','<div class="arcade-status">Loading minefield…</div>');reset();return;
+    }
+    const title={zombie:'LAST STAND: Z',pong2:'DUEL PONG',racerpro:'RACER: OVERDRIVE',invaders:'SPACE INVADERS: BOSS',ninja:'NEON NINJA'}[kind];
+    const help={zombie:'Move with WASD / arrows. Your blaster auto-fires at the nearest infected.',pong2:'Player 1: W/S. Player 2: ↑/↓. First to 5 points wins.',racerpro:'←/→ or A/D to change lanes. Traffic speeds up as your score rises.',invaders:'Move with ←/→ or A/D and fire with SPACE. Defeat the boss after two waves.',ninja:'Move with ←/→ or A/D. Press SPACE, W or ↑ to jump. Survive as long as possible.'}[kind];
+    arcadeStageView(title,'<div class="arcade-status">'+help+'</div><canvas id="extraArcadeCanvas" width="720" height="420" style="width:100%;max-width:720px;display:block;margin:14px auto;border:1px solid rgba(123,255,223,.35);border-radius:10px;background:#020813;touch-action:none"></canvas><div class="arcade-controls" style="justify-content:center"><button class="chess-btn" type="button" data-extra="left">◀ LEFT</button><button class="chess-btn" type="button" data-extra="jump">▲ JUMP / UP</button><button class="chess-btn" type="button" data-extra="right">RIGHT ▶</button><button class="chess-btn" type="button" data-extra="fire">FIRE</button><button class="chess-btn" id="extraRestart" type="button">RESTART</button><button class="chess-btn" type="button" data-arcade-back>BACK TO HUB</button></div>');
+    const canvas=$('extraArcadeCanvas'),ctx=canvas.getContext('2d'),W=canvas.width,H=canvas.height;
+    let frame=0,keys={},last=performance.now(),over=false,score=0,player={x:W/2,y:H-48,vx:0,vy:0},enemies=[],shots=[],enemyShots=[],particles=[],wave=1,boss=null,lives=3,p1=0,p2=0,ball={x:W/2,y:H/2,vx:4,vy:2},paddles=[H/2,H/2],lanes=[W*.3,W*.5,W*.7],traffic=[],ground=H-45,inv=0;
+    function spawnZ(){enemies.push({x:30+Math.random()*(W-60),y:30+Math.random()*120,r:11+Math.random()*4,s:.7+Math.random()*.55});}
+    function spawnInv(){enemies=[];for(let r=0;r<3;r++)for(let c=0;c<8;c++)enemies.push({x:80+c*78,y:48+r*38,w:24,h:18,alive:true});}
+    function reset(){over=false;score=0;wave=1;lives=3;player={x:W/2,y:H-48,vx:0,vy:0};enemies=[];shots=[];enemyShots=[];traffic=[];boss=null;inv=0;p1=0;p2=0;ball={x:W/2,y:H/2,vx:4,vy:2};paddles=[H/2,H/2];if(kind==='zombie')for(let i=0;i<7;i++)spawnZ();if(kind==='invaders')spawnInv();last=performance.now();if(arcadeCanvasFrame)cancelAnimationFrame(arcadeCanvasFrame);arcadeCanvasFrame=requestAnimationFrame(tick);}
+    function key(e,down){const k=e.key.toLowerCase();keys[k]=down;if(['arrowleft','arrowright','arrowup','arrowdown',' '].includes(k))e.preventDefault();}
+    arcadeCanvasKeyHandler=e=>key(e,true);document.addEventListener('keydown',arcadeCanvasKeyHandler);
+    const keyup=e=>key(e,false);document.addEventListener('keyup',keyup);
+    const cleanup=()=>{document.removeEventListener('keyup',keyup);};
+    $('arcadeStage').querySelectorAll('[data-extra]').forEach(b=>{b.onclick=()=>{const d=b.dataset.extra;if(d==='left')keys.arrowleft=true,setTimeout(()=>keys.arrowleft=false,170);if(d==='right')keys.arrowright=true,setTimeout(()=>keys.arrowright=false,170);if(d==='jump')keys[' ']=true,setTimeout(()=>keys[' ']=false,100);if(d==='fire')keys[' ']=true,setTimeout(()=>keys[' ']=false,120);};});
+    $('extraRestart').onclick=reset;
+    function text(txt,x,y,size=17,color='#7bffdf'){ctx.fillStyle=color;ctx.font='bold '+size+'px monospace';ctx.fillText(txt,x,y);}
+    function tick(now){
+      if(!document.getElementById('extraArcadeCanvas')){cleanup();return;}
+      const dt=Math.min((now-last)/16.67||1,2);last=now;ctx.fillStyle='#020813';ctx.fillRect(0,0,W,H);
+      for(let i=0;i<55;i++){ctx.fillStyle='#22536b';ctx.fillRect((i*137+Math.floor(now/80)*(i%3+1))%W,(i*83+Math.floor(now/50)*(i%2+1))%H,2,2);}
+      if(!over){
+        if(kind==='pong2'){
+          if(keys.w)paddles[0]-=6*dt;if(keys.s)paddles[0]+=6*dt;if(keys.arrowup)paddles[1]-=6*dt;if(keys.arrowdown)paddles[1]+=6*dt;paddles=paddles.map(v=>Math.max(38,Math.min(H-38,v)));
+          ball.x+=ball.vx*dt;ball.y+=ball.vy*dt;if(ball.y<8||ball.y>H-8)ball.vy*=-1;
+          if(ball.x<36&&Math.abs(ball.y-paddles[0])<46){ball.vx=Math.abs(ball.vx)*1.04;ball.vy+=(ball.y-paddles[0])*.05;}if(ball.x>W-36&&Math.abs(ball.y-paddles[1])<46){ball.vx=-Math.abs(ball.vx)*1.04;ball.vy+=(ball.y-paddles[1])*.05;}
+          if(ball.x<0){p2++;ball={x:W/2,y:H/2,vx:4,vy:2};}if(ball.x>W){p1++;ball={x:W/2,y:H/2,vx:-4,vy:2};}if(p1>=5||p2>=5)over=true;
+          ctx.fillStyle='#7bffdf';ctx.fillRect(22,paddles[0]-38,8,76);ctx.fillRect(W-30,paddles[1]-38,8,76);ctx.fillRect(ball.x-7,ball.y-7,14,14);text('P1 '+p1,40,28);text('P2 '+p2,W-100,28);
+        } else if(kind==='zombie'){
+          if(keys.arrowleft||keys.a)player.x-=4*dt;if(keys.arrowright||keys.d)player.x+=4*dt;if(keys.arrowup||keys.w)player.y-=4*dt;if(keys.arrowdown||keys.s)player.y+=4*dt;player.x=Math.max(15,Math.min(W-15,player.x));player.y=Math.max(20,Math.min(H-20,player.y));
+          if(now-inv>420){let target=enemies.reduce((a,b)=>Math.hypot(a.x-player.x,a.y-player.y)<Math.hypot(b.x-player.x,b.y-player.y)?a:b,enemies[0]);if(target){let a=Math.atan2(target.y-player.y,target.x-player.x);shots.push({x:player.x,y:player.y,vx:Math.cos(a)*7,vy:Math.sin(a)*7});}inv=now;}
+          if(enemies.length<12&&Math.random()<.025)spawnZ();enemies.forEach(e=>{let a=Math.atan2(player.y-e.y,player.x-e.x);e.x+=Math.cos(a)*e.s*dt;e.y+=Math.sin(a)*e.s*dt;if(Math.hypot(e.x-player.x,e.y-player.y)<e.r+9){lives--;e.x=Math.random()*W;e.y=Math.random()*H;if(lives<=0)over=true;}});
+          shots.forEach(b=>{b.x+=b.vx*dt;b.y+=b.vy*dt;enemies.forEach(e=>{if(Math.hypot(e.x-b.x,e.y-b.y)<e.r+4){e.dead=true;b.dead=true;score+=10;}});});enemies=enemies.filter(e=>!e.dead);shots=shots.filter(b=>!b.dead&&b.x>0&&b.x<W&&b.y>0&&b.y<H);
+          ctx.fillStyle='#7bffdf';ctx.beginPath();ctx.arc(player.x,player.y,10,0,Math.PI*2);ctx.fill();enemies.forEach(e=>{ctx.fillStyle='#8bff62';ctx.beginPath();ctx.arc(e.x,e.y,e.r,0,Math.PI*2);ctx.fill();});shots.forEach(b=>{ctx.fillStyle='#ffe66d';ctx.fillRect(b.x-3,b.y-3,6,6);});text('SCORE '+score,18,25);text('LIVES '+lives,590,25);
+        } else if(kind==='racerpro'){
+          const lane=lanes.reduce((a,b)=>Math.abs(b-player.x)<Math.abs(a-player.x)?b:a,lanes[1]);if(keys.arrowleft||keys.a)player.x=Math.max(lanes[0],player.x-7*dt);if(keys.arrowright||keys.d)player.x=Math.min(lanes[2],player.x+7*dt);
+          if(Math.random()<.035+Math.min(score/5000,.035))traffic.push({x:lanes[Math.floor(Math.random()*3)],y:-45,s:3+score/400});
+          traffic.forEach(t=>{t.y+=(t.s+score/300)*dt;if(Math.abs(t.x-player.x)<32&&Math.abs(t.y-player.y)<42)over=true;if(t.y>H+50){t.dead=true;score+=1;}});traffic=traffic.filter(t=>!t.dead);
+          ctx.strokeStyle='#33576b';ctx.setLineDash([18,18]);ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(W/3,0);ctx.lineTo(W/3,H);ctx.moveTo(2*W/3,0);ctx.lineTo(2*W/3,H);ctx.stroke();ctx.setLineDash([]);traffic.forEach(t=>{ctx.fillStyle='#ff526a';ctx.fillRect(t.x-17,t.y-25,34,50);});ctx.fillStyle='#7bffdf';ctx.fillRect(player.x-16,player.y-24,32,48);text('DISTANCE '+score,18,25);
+        } else if(kind==='invaders'){
+          if(keys.arrowleft||keys.a)player.x-=5*dt;if(keys.arrowright||keys.d)player.x+=5*dt;player.x=Math.max(20,Math.min(W-20,player.x));if(keys[' ']&&now-inv>220){shots.push({x:player.x,y:H-62});inv=now;}
+          shots.forEach(b=>b.y-=8*dt);shots=shots.filter(b=>b.y>0);
+          enemies.forEach(e=>{if(e.alive){e.x+=Math.sin(now/600+e.y)*.7*dt;e.y+=.025*dt;shots.forEach(b=>{if(Math.abs(b.x-e.x)<18&&Math.abs(b.y-e.y)<15){e.alive=false;b.dead=true;score+=10;}});if(e.y>H-85)over=true;}});shots=shots.filter(b=>!b.dead);
+          if(enemies.every(e=>!e.alive)&&!boss){wave++;if(wave>=3)boss={x:W/2,y:70,hp:24};else spawnInv();}
+          if(boss){boss.x=W/2+Math.sin(now/650)*220;if(Math.random()<.03)enemyShots.push({x:boss.x,y:boss.y+18});shots.forEach(b=>{if(Math.abs(b.x-boss.x)<44&&Math.abs(b.y-boss.y)<28){boss.hp--;b.dead=true;score+=20;}});shots=shots.filter(b=>!b.dead);enemyShots.forEach(b=>{b.y+=4*dt;if(Math.abs(b.x-player.x)<18&&Math.abs(b.y-(H-55))<20){lives--;b.dead=true;if(lives<=0)over=true;}});enemyShots=enemyShots.filter(b=>!b.dead&&b.y<H);ctx.fillStyle='#ff4776';ctx.fillRect(boss.x-48,boss.y-18,96,36);ctx.fillStyle='#ffe66d';ctx.fillRect(boss.x-48,boss.y-30,96*Math.max(0,boss.hp/24),5);if(boss.hp<=0){boss=null;over=true;score+=500;}}
+          ctx.fillStyle='#7bffdf';ctx.beginPath();ctx.moveTo(player.x,H-70);ctx.lineTo(player.x-15,H-42);ctx.lineTo(player.x+15,H-42);ctx.fill();enemies.filter(e=>e.alive).forEach(e=>{ctx.fillStyle='#b38bff';ctx.fillRect(e.x-11,e.y-8,22,16);});shots.forEach(b=>{ctx.fillStyle='#ffe66d';ctx.fillRect(b.x-2,b.y-8,4,12);});text('SCORE '+score+' · WAVE '+wave,18,25);text('LIVES '+lives,600,25);
+        } else if(kind==='ninja'){
+          if(keys.arrowleft||keys.a)player.x-=4*dt;if(keys.arrowright||keys.d)player.x+=4*dt;if((keys[' ']||keys.w||keys.arrowup)&&player.y>=ground-5)player.vy=-10;
+          player.vy+=.48*dt;player.y+=player.vy*dt;if(player.y>ground){player.y=ground;player.vy=0;}if(player.x>W-40){player.x=40;score+=10;}if(player.x<20)player.x=20;
+          if(Math.random()<.022)traffic.push({x:W+20,y:ground-12,w:18+Math.random()*16});traffic.forEach(h=>{h.x-=5*dt;if(Math.abs(h.x-player.x)<20&&Math.abs(h.y-player.y)<22)over=true;if(h.x< -40){h.dead=true;score+=1;}});traffic=traffic.filter(h=>!h.dead);
+          ctx.fillStyle='#14394a';ctx.fillRect(0,ground+12,W,H-ground);ctx.fillStyle='#ff4776';traffic.forEach(h=>ctx.fillRect(h.x,h.y-10,h.w,20));ctx.fillStyle='#7bffdf';ctx.fillRect(player.x-9,player.y-20,18,25);text('DISTANCE '+score,18,25);
+        }
+      }
+      if(over){ctx.fillStyle='rgba(1,6,15,.78)';ctx.fillRect(0,0,W,H);text('SIMULATION ENDED',W/2-110,H/2-12,23,'#ff6680');text('SCORE '+(kind==='pong2'?(p1+' - '+p2):score),W/2-70,H/2+22,18);text('PRESS RESTART',W/2-80,H/2+52,15);}
+      arcadeCanvasFrame=requestAnimationFrame(tick);
+    }
+    reset();
+  }
+
   function arcadeStartSpaceDefender() {
     if(spaceFrame)cancelAnimationFrame(spaceFrame);
     arcadeStageView('SPACE DEFENDER','<p>Defend the sector. Move with <b>← →</b> or <b>A / D</b>, fire with <b>SPACE</b>. On touchscreens, drag on the battlefield and tap FIRE.</p><div class="space-wrap"><canvas id="spaceCanvas" class="space-canvas" width="800" height="500" aria-label="Space Defender game battlefield"></canvas><div class="space-side"><div class="space-stat"><strong>SCORE</strong><span id="spaceScore">0</span></div><div class="space-stat"><strong>SECTOR</strong><span id="spaceWave">1</span></div><div class="space-stat"><strong>SHIELDS</strong><span id="spaceLives">3</span></div><button class="chess-btn" id="spaceFire" type="button">FIRE ✦</button><button class="chess-btn" id="spaceRestart" type="button">RESTART</button><button class="chess-btn" type="button" data-arcade-back>BACK TO HUB</button></div></div><div class="arcade-small" style="margin-top:10px">Tip: keep moving. Enemy formations speed up as you clear each wave.</div>');
