@@ -1249,6 +1249,26 @@
     });
   }
 
+  function requestWindowsLocalAction(action, path) {
+    return new Promise((resolve) => {
+      const requestId = `${Date.now()}-${"3fvvlfyrl88"}`;
+      const finish = (result) => {
+        window.removeEventListener('message', onMessage);
+        clearTimeout(timeout);
+        resolve(result);
+      };
+      const onMessage = (event) => {
+        if (event.source !== window || event.origin !== location.origin) return;
+        const message = event.data;
+        if (message?.source !== 'JARVIS_BRIDGE' || message.requestId !== requestId) return;
+        finish(message.result || { ok: false, error: 'No confirmation received from the Windows bridge.' });
+      };
+      const timeout = setTimeout(() => finish({ ok: false, error: 'JARVIS Windows bridge did not respond in time.' }), 15000);
+      window.addEventListener('message', onMessage);
+      window.postMessage({ source: 'JARVIS_PAGE', type: 'LOCAL_ACTION', requestId, action, path }, location.origin);
+    });
+  }
+
   async function send(text) {
     text = text.trim();
     if (!text || busy) return;
@@ -1321,6 +1341,16 @@
         } else {
           const result = await launchNativeApp(app);
           reply = result.ok ? `Opening ${app} now, sir.` : `I couldn't open ${app}: ${result.error || 'check the Windows app bridge and installed app name.'}`;
+        }
+      }
+      for (const action of data.local_actions || []) {
+        if (/Android|iPhone|iPad|iPod/i.test(navigator.userAgent)) {
+          reply = 'Windows folder actions are available when JARVIS is open in Chrome on your Windows PC.';
+        } else if (action?.action === 'open_folder' && typeof action.path === 'string') {
+          const result = await requestWindowsLocalAction(action.action, action.path);
+          reply = result.ok
+            ? `Opened folder ${result.opened || action.path}.`
+            : `I couldn't open that folder: ${result.error || 'check the Windows bridge and folder path.'}`;
         }
       }
       replyEl.textContent = reply;
