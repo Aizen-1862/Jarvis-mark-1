@@ -24,6 +24,7 @@ ROOT = Path(__file__).resolve().parent
 ENV_FILE = ROOT / ".env"
 ENV_EXAMPLE = ROOT / ".env.example"
 INDEX_HTML = ROOT / "web" / "index.html"
+LAB_HTML = ROOT / "web" / "lab.html"
 PROTOCOLS_FILE = ROOT / "protocols.json"
 
 FISH_TTS_URL = "https://api.fish.audio/v1/tts"
@@ -575,6 +576,8 @@ class Handler(BaseHTTPRequestHandler):
             return
         if path in ("/", "/index.html"):
             self._send(200, INDEX_HTML.read_bytes(), "text/html; charset=utf-8")
+        elif path == "/lab.html":
+            self._send(200, LAB_HTML.read_bytes(), "text/html; charset=utf-8")
         elif path == "/api/status":
             cfg = load_settings()
             self._json(200, {
