@@ -1,9 +1,9 @@
 {
-  "name": "com.jarvis.app_launcher",
-  "description": "Launches Calculator, Notepad, File Explorer, Paint, or Spotify for JARVIS.",
-  "path": "C:\\Users\\Prasad\\Documents\\Codex\\2026-10-23\\wake-up-claude-we-re-building\\work\\make-your-own-jarvis\\spotify-extension\\native_host.exe",
-  "type": "stdio",
-  "allowed_origins": [
-    "chrome-extension://aoanedegflcadgphfiakaabhbcaangbi/"
-  ]
+    "name":  "com.jarvis.app_launcher",
+    "description":  "Launches installed Windows apps by Start Menu display name for JARVIS.",
+    "path":  "C:\\Users\\Prasad\\Documents\\Codex\\2026-10-23\\wake-up-claude-we-re-building\\work\\make-your-own-jarvis\\spotify-extension\\native_host.exe",
+    "type":  "stdio",
+    "allowed_origins":  [
+                            "chrome-extension://khgincaplmbedfnhkpdoliapmflnpfah/"
+                        ]
 }

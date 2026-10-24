@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Text;
 using System.Web.Script.Serialization;
 
@@ -32,34 +33,109 @@ internal static class JarvisNativeHost
         output.Flush();
     }
 
-    private static void Launch(string app)
+    private static string Normalize(string value)
+    {
+        return new string((value ?? "").ToLowerInvariant().Where(Char.IsLetterOrDigit).ToArray());
+    }
+
+    private static void Start(string fileName, string arguments = "")
     {
         ProcessStartInfo start = new ProcessStartInfo();
+        start.FileName = fileName;
+        start.Arguments = arguments;
         start.UseShellExecute = true;
+        Process.Start(start);
+    }
 
-        switch (app)
+    private static string FindStartMenuShortcut(string app)
+    {
+        string wanted = Normalize(app);
+        string[] roots = new string[] {
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), @"Microsoft\Windows\Start Menu\Programs"),
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), @"Microsoft\Windows\Start Menu\Programs")
+        };
+        List<string> matches = new List<string>();
+        foreach (string root in roots)
         {
-            case "calculator":
-                start.FileName = "explorer.exe";
-                start.Arguments = @"shell:AppsFolder\Microsoft.WindowsCalculator_8wekyb3d8bbwe!App";
-                break;
-            case "notepad":
-                start.FileName = "notepad.exe";
-                break;
-            case "file explorer":
-                start.FileName = "explorer.exe";
-                break;
-            case "paint":
-                start.FileName = "mspaint.exe";
-                break;
-            case "spotify":
-                start.FileName = "spotify:";
-                break;
-            default:
-                throw new InvalidOperationException("App is not in the Windows launcher allowlist.");
+            if (!Directory.Exists(root)) continue;
+            foreach (string path in Directory.GetFiles(root, "*.lnk", SearchOption.AllDirectories))
+            {
+                string name = Path.GetFileNameWithoutExtension(path);
+                if (Normalize(name) == wanted) return path;
+                if (wanted.Length >= 3 && Normalize(name).StartsWith(wanted, StringComparison.Ordinal)) matches.Add(path);
+            }
+        }
+        if (matches.Count == 1) return matches[0];
+        if (matches.Count > 1) throw new InvalidOperationException("More than one installed app matches that name. Say its full Start Menu name.");
+        return null;
+    }
+
+    private static string FindPackagedAppId(string app)
+    {
+        // This fixed, read-only command enumerates Start Menu app names. The
+        // requested app name is never inserted into a shell command.
+        ProcessStartInfo info = new ProcessStartInfo();
+        info.FileName = "powershell.exe";
+        info.Arguments = "-NoProfile -NonInteractive -Command \"Get-StartApps | ForEach-Object { $_.Name + [char]9 + $_.AppID }\"";
+        info.UseShellExecute = false;
+        info.CreateNoWindow = true;
+        info.RedirectStandardOutput = true;
+        info.RedirectStandardError = false;
+        using (Process process = Process.Start(info))
+        {
+            System.Threading.Tasks.Task<string> outputTask = process.StandardOutput.ReadToEndAsync();
+            if (!process.WaitForExit(7000))
+            {
+                try { process.Kill(); } catch { }
+                return null;
+            }
+            string output = outputTask.Result;
+            string wanted = Normalize(app);
+            List<string> matches = new List<string>();
+            foreach (string line in output.Split(new char[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries))
+            {
+                string[] fields = line.Split(new char[] { '\t' }, 2);
+                if (fields.Length != 2) continue;
+                if (Normalize(fields[0]) == wanted) return fields[1].Trim();
+                if (wanted.Length >= 3 && Normalize(fields[0]).StartsWith(wanted, StringComparison.Ordinal)) matches.Add(fields[1].Trim());
+            }
+            if (matches.Count == 1) return matches[0];
+            if (matches.Count > 1) throw new InvalidOperationException("More than one installed app matches that name. Say its full Start Menu name.");
+        }
+        return null;
+    }
+
+    private static void Launch(string app)
+    {
+        if (String.IsNullOrWhiteSpace(app) || app.Length > 100 || app.Any(c => !(Char.IsLetterOrDigit(c) || " .&()+_-".IndexOf(c) >= 0)))
+            throw new InvalidOperationException("Give me an installed app's display name, not a command or file path.");
+
+        string shortcut = FindStartMenuShortcut(app);
+        if (shortcut != null)
+        {
+            Start(shortcut);
+            return;
         }
 
-        Process.Start(start);
+        string appId = FindPackagedAppId(app);
+        if (appId != null)
+        {
+            Start("explorer.exe", "shell:AppsFolder\\" + appId);
+            return;
+        }
+
+        string normalized = Normalize(app);
+        if (normalized == "fileexplorer") { Start("explorer.exe"); return; }
+        if (normalized == "calculator") { Start("calc.exe"); return; }
+        if (normalized == "notepad") { Start("notepad.exe"); return; }
+        if (normalized == "paint") { Start("mspaint.exe"); return; }
+        throw new InvalidOperationException("I couldn't find that app in this Windows account's Start Menu. Try its full app name.");
+    }
+
+    private static object SafeLaunch(string app)
+    {
+        Launch(app);
+        return new Dictionary<string, object> { { "ok", true }, { "launched", app } };
     }
 
     private static void Main(string[] args)
@@ -87,8 +163,7 @@ internal static class JarvisNativeHost
                 throw new InvalidOperationException("Unsupported action.");
 
             string app = Convert.ToString(message.ContainsKey("app") ? message["app"] : null);
-            Launch(app);
-            Respond(new Dictionary<string, object> { { "ok", true }, { "launched", app } });
+            Respond(SafeLaunch(app));
         }
         catch (Exception error)
         {

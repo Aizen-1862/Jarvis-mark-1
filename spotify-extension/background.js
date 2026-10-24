@@ -1,7 +1,6 @@
-const allowedApps = new Set(["calculator", "notepad", "file explorer", "paint", "spotify"]);
-
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
-  if (message?.type !== "launch_app" || !allowedApps.has(message.app)) return false;
+  if (message?.type !== "launch_app" || typeof message.app !== "string" ||
+      !/^[\w][\w .&()+-]{0,99}$/.test(message.app)) return false;
 
   chrome.runtime.sendNativeMessage("com.jarvis.app_launcher", {
     action: "open_app",

@@ -1,11 +1,10 @@
 (() => {
-  const allowedApps = new Set(["calculator", "notepad", "file explorer", "paint", "spotify"]);
-
   window.addEventListener("message", (event) => {
     if (event.source !== window || event.origin !== location.origin) return;
     const message = event.data;
     if (message?.source !== "JARVIS_PAGE" || message.type !== "LAUNCH_APP") return;
-    if (typeof message.requestId !== "string" || !allowedApps.has(message.app)) return;
+    if (typeof message.requestId !== "string" || typeof message.app !== "string" ||
+        !/^[\w][\w .&()+-]{0,99}$/.test(message.app)) return;
 
     chrome.runtime.sendMessage({
       type: "launch_app",

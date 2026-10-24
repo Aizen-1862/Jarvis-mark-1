@@ -10,11 +10,12 @@ JARVIS is a local-first voice assistant with a browser interface, OpenRouter for
 
 ## Host the web assistant on Render
 
-The included `render.yaml` configures a Python web service. In Render, create a Blueprint from this private GitHub repository, then enter these environment secrets when prompted:
+The included `render.yaml` configures a Python web service. In Render, create a Blueprint from this GitHub repository, then enter these environment secrets when prompted:
 
 - `JARVIS_ACCESS_PASSWORD`: a strong, unique password for the JARVIS website. The browser asks for username `jarvis` and this password.
 - `FISH_API_KEY`: a newly rotated Fish Audio key.
 - `OPENROUTER_API_KEY`: a newly rotated OpenRouter key.
+- `GOOGLE_CLIENT_ID`: optional Google OAuth Web client ID for Work Mode mail summaries. Enable the Gmail API, add the Render URL as an authorized JavaScript origin, and configure the OAuth consent screen and test users in Google Cloud. JARVIS requests only the `gmail.readonly` scope.
 
 Render supplies `PORT`; the service binds to `0.0.0.0`, disables browser auto-launch, and uses `/healthz` for health checks. JARVIS refuses to start publicly without the password and both API keys. The Render URL uses HTTPS, which protects Basic Auth credentials in transit.
 
@@ -22,6 +23,15 @@ Never upload `.env`, API keys, or passwords to GitHub. The `.env.example` file c
 
 ## What works remotely
 
-The hosted website can be opened from computers and phones using the same Render URL and password. The local Windows native app bridge is separate: it can only launch apps on a Windows computer where the Chrome extension and native host are installed. A cloud service cannot open Calculator on your local computer by itself. The extension's JARVIS page permission currently targets `127.0.0.1`; after the Render URL exists, update that permission to the exact hosted domain before using the Windows bridge through the hosted page.
+The hosted website can be opened from computers and phones using the same Render URL and password. The local Windows native app bridge is separate: it can only launch apps on a Windows computer where the Chrome extension and native host are installed. A cloud service cannot open Calculator on your local computer by itself. The extension allows both `127.0.0.1` and the current hosted domain `jarvis-mark-1-k6sq.onrender.com`.
 
-The browser voice-input API is most consistent in desktop Chrome or Edge. Typed requests remain available when voice input is unsupported.
+The browser voice-input API is most consistent in desktop Chrome or Edge. Typed requests remain available when voice input is unsupported. General answers stream as they are generated; requests for changing facts use OpenRouter web search when supported by the selected model.
+
+## Additional features and limits
+
+- **Work Mode:** after Google OAuth is configured and you grant read-only permission, JARVIS summarizes up to 200 unread inbox messages. Mail content is sent to OpenRouter for summarization. It does not send, archive, delete, or modify messages.
+- **Image generation:** ask JARVIS to generate an image. The configured OpenRouter image model may charge per image; JARVIS shows the reported cost.
+- **Mobile app links:** Android has deep links for a small set of common apps; iOS support depends on app URL schemes. A web page cannot enumerate or launch every installed phone app. Computer apps still launch only through the Windows bridge on that computer.
+- **E-girl mode:** say `activate e-girl mode`; say `activate JARVIS mode` to restore the default persona.
+
+If a key has been exposed, revoke it at its provider and replace the value in the hosting dashboard or local `.env` file. Keep secrets out of GitHub.

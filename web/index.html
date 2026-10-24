@@ -7,6 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700&family=Rajdhani:wght@500;600&display=swap">
+<script src="https://accounts.google.com/gsi/client" async defer></script>
 <style>
   :root {
     --bg: #02060c;
@@ -19,6 +20,7 @@
     --panel: rgba(10, 30, 45, 0.55);
     --accent: var(--cyan);
   }
+  body.mode-egirl { --bg: #160b19; --cyan: #ff8bda; --glow: rgba(255,139,218,.38); --accent: #ff8bda; --panel: rgba(40,13,40,.62); }
   * { box-sizing: border-box; }
   html, body { height: 100%; margin: 0; }
   body {
@@ -165,6 +167,8 @@
     font-size: 15px;
     z-index: 5;
   }
+  .generated-image { display:block; max-width:min(520px,100%); max-height:54vh; margin:14px 0 0; border:1px solid var(--accent); border-radius:14px; box-shadow:0 0 24px var(--glow); }
+  .action-link { display:inline-block; margin:10px 0 0; padding:9px 14px; border:1px solid var(--accent); border-radius:10px; color:var(--text); text-decoration:none; }
   .wake {
     position: fixed;
     inset: 0;
@@ -232,10 +236,12 @@
   const LABELS = { idle: 'Standing by', listening: 'Listening', thinking: 'Thinking', speaking: 'Speaking' };
   let calls = 'sir';
   let protocols = [];
+  let googleClientId = '';
   let busy = false;
 
   function setState(state) {
-    document.body.className = 'state-' + state;
+    document.body.classList.remove('state-idle', 'state-listening', 'state-thinking', 'state-speaking');
+    document.body.classList.add('state-' + state);
     statusEl.textContent = LABELS[state];
   }
 
@@ -277,6 +283,8 @@
       const s = await (await fetch('/api/status')).json();
       calls = s.calls || 'sir';
       protocols = Array.isArray(s.protocols) ? s.protocols : [];
+      googleClientId = s.google_client_id || '';
+      document.body.classList.toggle('mode-egirl', s.mode === 'egirl');
       $('dotVoice').className = 'dot ' + (s.voice ? 'on' : 'off');
       $('dotBrain').className = 'dot ' + (s.brain ? 'on' : 'off');
       if (!s.brain) toast('No brain key yet. Add your OpenRouter key to the .env file and restart JARVIS.');
@@ -365,8 +373,13 @@
     if (token === speakToken) setState('idle');
   }
 
+  function imageRequest(text) {
+    const match = text.match(/^\s*(?:please\s+)?(?:generate|create|draw|make)\s+(?:me\s+)?(?:an?\s+)?(?:image|picture|photo|illustration|logo)\s*(?:of|for|showing)?\s*(.*)$/i);
+    return match ? match[1].trim() || text.trim() : '';
+  }
+
   function isActionRequest(text) {
-    const command = /^(?:please\s+)?(?:(?:can|could)\s+you\s+)?(?:please\s+)?(?:open|launch|start|run|play|search|google|look\s+up|check|read|summari[sz]e|review|show|fetch|retrieve|turn\s+on|turn\s+off|set|stop|pause|resume|skip)\b/i;
+    const command = /^(?:please\s+)?(?:(?:can|could)\s+you\s+)?(?:please\s+)?(?:open|launch|start|run|play|check|read|summari[sz]e|review|show|fetch|retrieve|turn\s+on|turn\s+off|set|stop|pause|resume|skip|generate|create|draw|make)\b/i;
     const normalized = text.toLowerCase().replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
     return command.test(text) || protocols.some((phrase) => normalized.includes(String(phrase).toLowerCase()));
   }
@@ -480,6 +493,165 @@
     if (token === speakToken) setState('idle');
   }
 
+  const phoneAppMap = {
+    spotify: { android: 'intent://open.spotify.com/#Intent;scheme=https;package=com.spotify.music;end', ios: 'spotify://' },
+    youtube: { android: 'intent://www.youtube.com/#Intent;scheme=https;package=com.google.android.youtube;end', ios: 'youtube://' },
+    gmail: { android: 'intent://mail.google.com/#Intent;scheme=https;package=com.google.android.gm;end' },
+    chrome: { android: 'intent://www.google.com/#Intent;scheme=https;package=com.android.chrome;end' },
+    maps: { android: 'intent://maps.google.com/#Intent;scheme=https;package=com.google.android.apps.maps;end', ios: 'maps://' },
+    'google maps': { android: 'intent://maps.google.com/#Intent;scheme=https;package=com.google.android.apps.maps;end', ios: 'maps://' },
+    whatsapp: { android: 'intent://send/#Intent;scheme=whatsapp;package=com.whatsapp;end', ios: 'whatsapp://' },
+    instagram: { android: 'intent://instagram.com/#Intent;scheme=https;package=com.instagram.android;end', ios: 'instagram://' },
+    tiktok: { android: 'intent://www.tiktok.com/#Intent;scheme=https;package=com.zhiliaoapp.musically;end' },
+    camera: { android: 'intent:#Intent;action=android.media.action.IMAGE_CAPTURE;end' },
+    phone: { android: 'intent:#Intent;action=android.intent.action.DIAL;end', ios: 'tel:' },
+    messages: { android: 'intent:#Intent;action=android.intent.action.SENDTO;scheme=smsto;end', ios: 'sms:' },
+    settings: { android: 'intent:#Intent;action=android.settings.SETTINGS;end' },
+    photos: { android: 'intent://photos.google.com/#Intent;scheme=https;package=com.google.android.apps.photos;end' },
+    calendar: { android: 'intent://calendar.google.com/#Intent;scheme=https;package=com.google.android.calendar;end' },
+  };
+  function phoneAppLink(app) {
+    const name = app.toLowerCase().trim();
+    const config = phoneAppMap[name];
+    if (!config) return '';
+    if (/Android/i.test(navigator.userAgent)) return config.android || '';
+    return config.ios || '';
+  }
+
+  async function generateImage(prompt, replyEl) {
+    replyEl.textContent = 'Generating your image… This may use OpenRouter credits.';
+    setState('thinking');
+    const response = await fetch('/api/images', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt }),
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Image generation failed.');
+    replyEl.textContent = data.cost == null ? 'Here is your image. OpenRouter did not report the cost.' : `Here is your image. OpenRouter reported a cost of $${Number(data.cost).toFixed(4)}.`;
+    const image = document.createElement('img');
+    image.className = 'generated-image';
+    image.alt = prompt || 'Image generated by JARVIS';
+    image.src = `data:${data.media_type || 'image/png'};base64,${data.image}`;
+    replyEl.parentElement.append(image);
+    busy = false;
+    void speak('I created that image for you, sir.');
+  }
+
+  let gmailAccessToken = '';
+  function requestGmailAccess() {
+    if (!googleClientId) return Promise.reject(new Error('Gmail setup is incomplete: add GOOGLE_CLIENT_ID in Render and allow the JARVIS site as an authorized JavaScript origin.'));
+    if (!window.google?.accounts?.oauth2) return Promise.reject(new Error('Google sign-in is still loading. Tap Connect Gmail again in a moment.'));
+    return new Promise((resolve, reject) => {
+      const client = google.accounts.oauth2.initTokenClient({
+        client_id: googleClientId,
+        scope: 'https://www.googleapis.com/auth/gmail.readonly',
+        callback: (result) => {
+          if (result?.access_token) { gmailAccessToken = result.access_token; resolve(gmailAccessToken); }
+          else reject(new Error(result?.error_description || result?.error || 'Gmail access was not granted.'));
+        },
+        error_callback: (error) => reject(new Error(error?.message || 'Google sign-in could not open.')),
+      });
+      client.requestAccessToken({ prompt: '' });
+    });
+  }
+
+  async function gmailApi(url, token) {
+    const response = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+    if (!response.ok) {
+      if (response.status === 401) gmailAccessToken = '';
+      throw new Error(response.status === 403 ? 'Google has not granted Gmail read access. Check the Gmail API and OAuth consent settings.' : `Gmail returned an error (${response.status}).`);
+    }
+    return response.json();
+  }
+
+  function decodeMailPart(data) {
+    if (!data) return '';
+    const base64 = data.replace(/-/g, '+').replace(/_/g, '/');
+    const binary = atob(base64 + '='.repeat((4 - base64.length % 4) % 4));
+    return new TextDecoder().decode(Uint8Array.from(binary, (char) => char.charCodeAt(0)));
+  }
+
+  function mailBody(payload) {
+    const plain = [];
+    const html = [];
+    const visit = (part) => {
+      if (!part) return;
+      const body = part.body?.data;
+      if (body && part.mimeType === 'text/plain') plain.push(decodeMailPart(body));
+      else if (body && part.mimeType === 'text/html') html.push(decodeMailPart(body));
+      for (const child of part.parts || []) visit(child);
+    };
+    visit(payload);
+    if (plain.length) return plain.join('\n').replace(/\s+/g, ' ').trim().slice(0, 2500);
+    if (html.length) {
+      const doc = new DOMParser().parseFromString(html.join('\n'), 'text/html');
+      doc.querySelectorAll('script,style').forEach((node) => node.remove());
+      return (doc.body.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 2500);
+    }
+    return '';
+  }
+
+  function addGmailConnectButton(replyEl) {
+    if (replyEl.parentElement.querySelector('.gmail-connect')) return;
+    const button = document.createElement('button');
+    button.className = 'action-link gmail-connect';
+    button.type = 'button';
+    button.textContent = 'Connect Gmail and read unread mail';
+    button.addEventListener('click', async () => {
+      button.disabled = true;
+      try { await readWorkMail(replyEl, await requestGmailAccess()); }
+      catch (error) { replyEl.textContent = error.message || 'Gmail connection failed.'; button.disabled = false; }
+    });
+    replyEl.parentElement.append(button);
+  }
+
+  async function readWorkMail(replyEl, token) {
+    replyEl.textContent = 'Reading unread Gmail messages. Their content will be sent to OpenRouter to create the summary.';
+    setState('thinking');
+    let ids = [];
+    let pageToken = '';
+    while (ids.length < 200) {
+      const params = new URLSearchParams({ q: 'is:unread in:inbox', maxResults: '100' });
+      if (pageToken) params.set('pageToken', pageToken);
+      const page = await gmailApi(`https://gmail.googleapis.com/gmail/v1/users/me/messages?${params}`, token);
+      ids.push(...(page.messages || []).map((message) => message.id));
+      pageToken = page.nextPageToken || '';
+      if (!pageToken) break;
+    }
+    ids = ids.slice(0, 200);
+    if (!ids.length) {
+      replyEl.textContent = 'There are no unread messages in your inbox, sir.';
+      busy = false;
+      void speak(replyEl.textContent);
+      return;
+    }
+    const messages = [];
+    for (let i = 0; i < ids.length; i += 5) {
+      const batch = await Promise.all(ids.slice(i, i + 5).map(async (id) => {
+        const mail = await gmailApi(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${encodeURIComponent(id)}?format=full`, token);
+        const headers = mail.payload?.headers || [];
+        const header = (name) => headers.find((item) => item.name?.toLowerCase() === name)?.value || '';
+        return { from: header('from'), subject: header('subject'), date: header('date'), body: mailBody(mail.payload) || mail.snippet || '' };
+      }));
+      messages.push(...batch);
+      replyEl.textContent = `Reading unread mail: ${messages.length} of ${ids.length} messages…`;
+    }
+    const summaries = [];
+    for (let i = 0; i < messages.length; i += 10) {
+      const response = await fetch('/api/summarize-mails', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages: messages.slice(i, i + 10) }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'JARVIS could not summarize the mail.');
+      summaries.push(data.reply);
+      replyEl.textContent = `Unread mail summary (${Math.min(i + 10, messages.length)} of ${messages.length}):\n\n${summaries.join('\n\n')}`;
+    }
+    if (ids.length === 200) replyEl.textContent += '\n\nI checked the 200 most recent unread messages; there may be more.';
+    busy = false;
+    void speak(replyEl.textContent);
+  }
+
   // ---- talking to the brain
   function launchNativeApp(app) {
     return new Promise((resolve) => {
@@ -511,7 +683,18 @@
     showExchange(text, '');
     setState('thinking');
     const replyEl = addLine('jarvis', 'JARVIS', '...');
+    const requestsMail = /\b(?:activate|start|enable|turn\s+on)\s+work\s+mode\b|\b(?:check|read|summari[sz]e|review|show|fetch|retrieve|look\s+at)\b.*\b(?:e-?mails?|mails?|messages?|inbox)\b|\b(?:e-?mails?|mails?|messages?|inbox)\b.*\b(?:check|read|summari[sz]e|review|show|fetch|retrieve)\b/i.test(text);
+    // Start OAuth while this is still directly inside the user's click/key action;
+    // browsers may block the Google consent popup if we wait for the server first.
+    const gmailAuthorization = requestsMail
+      ? requestGmailAccess().then((token) => ({ token }), (error) => ({ error }))
+      : null;
     try {
+      const prompt = imageRequest(text);
+      if (prompt) {
+        await generateImage(prompt, replyEl);
+        return;
+      }
       if (!isActionRequest(text)) {
         replyEl.textContent = '';
         await streamReply(text, replyEl);
@@ -525,11 +708,39 @@
       const data = await r.json();
       let reply = data.reply || data.error || 'Something went wrong.';
       for (const app of data.launch_apps || []) {
-        const result = await launchNativeApp(app);
-        const appName = app.replace(/\b\w/g, (letter) => letter.toUpperCase());
-        reply = result.ok ? `Opening ${appName} now, sir.` : `I can't open ${appName} yet, sir. Enable the JARVIS Windows app bridge.`;
+        const mobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+        const href = mobile ? phoneAppLink(app) : '';
+        if (href) {
+          reply = `Tap below to open ${app} on your phone.`;
+          const link = document.createElement('a');
+          link.className = 'action-link';
+          link.href = href;
+          link.textContent = `Open ${app}`;
+          link.rel = 'noopener';
+          replyEl.parentElement.append(link);
+        } else if (mobile) {
+          reply = `I don't have a launch link for ${app} on this phone yet. Phone browsers can't list every installed app.`;
+        } else {
+          const result = await launchNativeApp(app);
+          reply = result.ok ? `Opening ${app} now, sir.` : `I couldn't open ${app}: ${result.error || 'check the Windows app bridge and installed app name.'}`;
+        }
       }
       replyEl.textContent = reply;
+      document.body.classList.toggle('mode-egirl', data.mode === 'egirl');
+      if (data.work_mode || (requestsMail && gmailAuthorization)) {
+        const authorization = await gmailAuthorization;
+        if (authorization?.token) {
+          await readWorkMail(replyEl, authorization.token);
+          return;
+        }
+        if (authorization?.error) {
+          replyEl.textContent = authorization.error.message || 'Connect Gmail to read your mail.';
+          addGmailConnectButton(replyEl);
+          busy = false;
+          setState('idle');
+          return;
+        }
+      }
       for (const url of data.open || []) {
         const link = document.createElement('a');
         link.href = url;
@@ -551,8 +762,8 @@
       // the voice. The answer is already visible; speech can run in the
       // background and still be cancelled by the next interaction.
       void speak(reply);
-    } catch {
-      replyEl.textContent = 'I lost contact with my server or voice service. Is the JARVIS window still open?';
+    } catch (err) {
+      replyEl.textContent = err?.message || 'I lost contact with the JARVIS server. Is the JARVIS window still open?';
       toast(replyEl.textContent);
       busy = false;
       setState('idle');

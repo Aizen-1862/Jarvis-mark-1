@@ -8,9 +8,13 @@ $ErrorActionPreference = 'Stop'
 $hostName = 'com.jarvis.app_launcher'
 $nativeHost = Join-Path $PSScriptRoot 'native_host.exe'
 $hostSource = Join-Path $PSScriptRoot 'native_host.cs'
-$manifestPath = Join-Path $PSScriptRoot 'com.jarvis.app_launcher.json'
+$manifestPath = Join-Path $PSScriptRoot 'com.jarvis.app_launcher'
 
-if (-not (Test-Path -LiteralPath $nativeHost)) {
+$needsBuild = -not (Test-Path -LiteralPath $nativeHost)
+if (-not $needsBuild) {
+  $needsBuild = (Get-Item -LiteralPath $hostSource).LastWriteTimeUtc -gt (Get-Item -LiteralPath $nativeHost).LastWriteTimeUtc
+}
+if ($needsBuild) {
   $framework = Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319'
   if (-not (Test-Path -LiteralPath (Join-Path $framework 'csc.exe'))) {
     $framework = Join-Path $env:WINDIR 'Microsoft.NET\Framework\v4.0.30319'
@@ -26,7 +30,7 @@ if (-not (Test-Path -LiteralPath $nativeHost)) {
 
 $manifest = [ordered]@{
   name = $hostName
-  description = 'Launches Calculator, Notepad, File Explorer, Paint, or Spotify for JARVIS.'
+  description = 'Launches installed Windows apps by Start Menu display name for JARVIS.'
   path = $nativeHost
   type = 'stdio'
   allowed_origins = @("chrome-extension://$ExtensionId/")

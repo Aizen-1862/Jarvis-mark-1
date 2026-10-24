@@ -1,4 +1,3 @@
-
 services:
   - type: web
     name: jarvis
@@ -8,15 +7,17 @@ services:
     startCommand: python -u jarvis.py
     healthCheckPath: /healthz
     envVars:
-      - key: PYTHONUNBUFFERED
-        value: "1"
       - key: JARVIS_HOST
-        value: "0.0.0.0"
+        value: 0.0.0.0
       - key: JARVIS_NO_BROWSER
+        value: "1"
+      - key: PYTHONUNBUFFERED
         value: "1"
       - key: JARVIS_ACCESS_PASSWORD
         sync: false
       - key: FISH_API_KEY
         sync: false
       - key: OPENROUTER_API_KEY
+        sync: false
+      - key: GOOGLE_CLIENT_ID
         sync: false
