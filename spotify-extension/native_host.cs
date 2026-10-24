@@ -138,6 +138,36 @@ internal static class JarvisNativeHost
         return new Dictionary<string, object> { { "ok", true }, { "launched", app } };
     }
 
+    private static object SafeOpenFolder(string rawPath)
+    {
+        if (String.IsNullOrWhiteSpace(rawPath) || rawPath.Length > 1024)
+            throw new InvalidOperationException("Give me a folder inside your Windows user folder.");
+
+        string home = Path.GetFullPath(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile));
+        string candidate = Path.IsPathRooted(rawPath) ? rawPath : Path.Combine(home, rawPath);
+        string fullPath = Path.GetFullPath(candidate);
+        string homePrefix = home.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) + Path.DirectorySeparatorChar;
+        if (!fullPath.Equals(home, StringComparison.OrdinalIgnoreCase) &&
+            !fullPath.StartsWith(homePrefix, StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("For safety, JARVIS can only open folders inside your Windows user folder.");
+
+        string relative = fullPath.Substring(home.Length).TrimStart(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        string[] blocked = new string[] { ".git", ".ssh", ".gnupg", ".aws", ".azure", "appdata", "credentials", "secrets" };
+        if (relative.Split(new char[] { Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar }, StringSplitOptions.RemoveEmptyEntries)
+            .Any(part => blocked.Contains(part, StringComparer.OrdinalIgnoreCase)))
+            throw new InvalidOperationException("That folder is restricted because it may contain private data.");
+
+        if (!Directory.Exists(fullPath))
+            throw new DirectoryNotFoundException("That folder does not exist inside your user folder.");
+
+        ProcessStartInfo start = new ProcessStartInfo();
+        start.FileName = "explorer.exe";
+        start.Arguments = "\"" + fullPath.Replace("\"", "\\\"") + "\"";
+        start.UseShellExecute = true;
+        Process.Start(start);
+        return new Dictionary<string, object> { { "ok", true }, { "opened", fullPath } };
+    }
+
     private static void Main(string[] args)
     {
         try
@@ -159,11 +189,24 @@ internal static class JarvisNativeHost
             string json = Encoding.UTF8.GetString(ReadExact(input, length));
             Dictionary<string, object> message = new JavaScriptSerializer()
                 .Deserialize<Dictionary<string, object>>(json);
-            if (message == null || !Object.Equals(message.ContainsKey("action") ? message["action"] : null, "open_app"))
+            if (message == null)
                 throw new InvalidOperationException("Unsupported action.");
 
-            string app = Convert.ToString(message.ContainsKey("app") ? message["app"] : null);
-            Respond(SafeLaunch(app));
+            string action = Convert.ToString(message.ContainsKey("action") ? message["action"] : null);
+            if (action == "open_app")
+            {
+                string app = Convert.ToString(message.ContainsKey("app") ? message["app"] : null);
+                Respond(SafeLaunch(app));
+            }
+            else if (action == "open_folder")
+            {
+                string path = Convert.ToString(message.ContainsKey("path") ? message["path"] : null);
+                Respond(SafeOpenFolder(path));
+            }
+            else
+            {
+                throw new InvalidOperationException("Unsupported action.");
+            }
         }
         catch (Exception error)
         {
