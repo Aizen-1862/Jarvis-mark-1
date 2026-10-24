@@ -1251,7 +1251,7 @@
 
   function requestWindowsLocalAction(action, path) {
     return new Promise((resolve) => {
-      const requestId = `${Date.now()}-${"3fvvlfyrl88"}`;
+      const requestId = Date.now() + '-' + Math.random().toString(36).slice(2);
       const finish = (result) => {
         window.removeEventListener('message', onMessage);
         clearTimeout(timeout);
