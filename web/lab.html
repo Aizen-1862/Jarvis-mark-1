@@ -145,7 +145,21 @@ mesh(new THREE.BoxGeometry(1.35,.92,.12),cast,'Timing cover',[0,.04,.54],'Cranks
 mesh(new THREE.CylinderGeometry(.1,.1,.28,24),mat.blue,'Oil filter',[-.82,-.6,.03],'Oil pan',[0,0,Math.PI/2]);
 mesh(new THREE.BoxGeometry(1.95,.1,1.2),black,'Engine mount',[0,-1,0],'Cylinder banks');
 }
-function buildMolecule(){ball('Oxygen',.48,mat.red,[0,0,0],'Oxygen');tube('O-H bond',[0,0,0],[-.9,.65,0],.075,mat.white,'Covalent bonds');tube('O-H bond',[0,0,0],[.9,.65,0],.075,mat.white,'Covalent bonds');ball('Hydrogen',.27,mat.white,[-.9,.65,0],'Hydrogen');ball('Hydrogen',.27,mat.white,[.9,.65,0],'Hydrogen')}
+function buildMolecule(){
+ const oxygen=new THREE.MeshStandardMaterial({color:0xd94b48,roughness:.32,metalness:.02});
+ const hydrogen=new THREE.MeshStandardMaterial({color:0xe9eff2,roughness:.24,metalness:.05});
+ const bond=new THREE.MeshStandardMaterial({color:0xaebdc5,roughness:.3,metalness:.25});
+ ball('Oxygen',.43,oxygen,[0,0,0],'Oxygen');
+ tube('O-H covalent bond',[0,0,0],[-.82,.58,0],.065,bond,'Covalent bonds');
+ tube('O-H covalent bond',[0,0,0],[.82,.58,0],.065,bond,'Covalent bonds');
+ ball('Hydrogen',.235,hydrogen,[-.82,.58,0],'Hydrogen');
+ ball('Hydrogen',.235,hydrogen,[.82,.58,0],'Hydrogen');
+ // Faint lobes indicate the oxygen's electron-rich regions, not physical solid objects.
+ for(const side of [-1,1]){
+  const lobe=new THREE.Mesh(new THREE.SphereGeometry(.19,24,16),new THREE.MeshBasicMaterial({color:0x3fd8ff,transparent:true,opacity:.12,depthWrite:false}));
+  lobe.position.set(side*.35,.53,0);lobe.scale.set(1,1.35,.8);lobe.name='Electron lone-pair region';lobe.userData.part='Oxygen';world.add(lobe);active.push(lobe);pickables.push(lobe);
+ }
+}
 function buildEarth(){
  const earthMat=new THREE.MeshStandardMaterial({map:makeSurfaceTexture('earth'),roughness:.86,metalness:.01});
  const globe=ball('Earth',1.2,earthMat,[0,0,0],'Crust');
